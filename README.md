@@ -1,9 +1,5 @@
 # Hype Scene Magic
 
-Certainly, here's an enhanced "Overview" section that includes a comparison to its inspiration from Keynote's magic transitions:
-
----
-
 ## Overview
 
 Hype SceneMagic is a high-performance JavaScript extension crafted to bring the ease and sophistication of Keynote's "Magic Move" transitions into the realm of Tumult Hype projects. With a focus on delivering visually captivating scene transitions, it bridges the gap between the effortless animations found in presentation software and the often complex world of web development.
