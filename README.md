@@ -67,10 +67,6 @@ Basic example to show a named scene with magic transition:
 hypeDocument.showSceneNamedMagic('Scene2', 1.0, 'easeinout');
 ```
 
-## Contributing
-
-Contributions, whether it be feature requests, bug reports, or code contributions, are always welcome! Please read our contributing guidelines before making any changes.
-
 ## FAQ
 
 ### How do I integrate Hype SceneMagic in existing projects?
