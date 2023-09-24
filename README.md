@@ -24,16 +24,6 @@ In a similar fashion, Hype SceneMagic identifies "magical" elements within your 
 
 By offering a streamlined API with automatic magic transition capabilities, Hype SceneMagic empowers you to create presentations and web experiences that are as engaging as they are effortless, echoing the convenience and sophistication of Keynote's transitions in a web-centric context.
 
-## Features
-
-- **Seamless Scene Transitions**: Achieve smooth and visually captivating transitions between scenes.
-  
-- **Hype CommandPipeline Compatibility**: Integrate easily with existing Hype CommandPipeline functionalities.
-
-- **Click Prevention**: Built-in mechanisms to prevent undesired clicks during transitions.
-
-- **Customizable**: Extendable properties and attributes offer maximum flexibility and customization.
-
 ## Version History
 
 - 2.0: Major rewrite, now released under the MIT license.
