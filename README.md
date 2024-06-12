@@ -1,16 +1,16 @@
 # Hype Scene Magic 
 
-#### Overview
+### Overview
 
-**SceneMagic** is a powerful tool for creating visually stunning scene transitions within Tumult Hype. Inspired by the fluid animations and seamless transitions introduced by Steve Jobs in Apple's Keynote presentations, SceneMagic harnesses the potential of web animations to enhance performance and interactivity. Whether you're creating simple animations or complex transitions, SceneMagic offers a versatile set of tools to bring your content to life.
+**Hype Scene Magic** is a powerful tool for creating visually stunning scene transitions within Tumult Hype. Inspired by the fluid animations and seamless transitions introduced by Steve Jobs in Apple's Keynote presentations, SceneMagic harnesses the potential of web animations to enhance performance and interactivity. Whether you're creating simple animations or complex transitions, SceneMagic offers a versatile set of tools to bring your content to life.
 
 ---
 
-### Getting Started
+## Getting Started
 
 To begin using SceneMagic, follow these steps to set up a basic transition:
 
-#### Step-by-Step Guide
+### Step-by-Step Guide
 
 1. **Add SceneMagic Script to Your Project**:
    - Open the **Head HTML** section of your Tumult Hype document.
@@ -29,9 +29,9 @@ To begin using SceneMagic, follow these steps to set up a basic transition:
 
 ---
 
-### Examples
+## Examples
 
-#### Simple Example: Fade Transition
+### Simple Example: Fade Transition
 
 1. **Scene Setup**:
    - Create two scenes in Tumult Hype.
@@ -56,7 +56,7 @@ To begin using SceneMagic, follow these steps to set up a basic transition:
    ```
    - Attach this function to a button or event to trigger the transition.
 
-#### Intermediate Example: Slide Transition
+### Intermediate Example: Slide Transition
 
 1. **Scene Setup**:
    - Similar to the simple example, create two scenes and add elements with `magic` classes in Tumult Hype.
@@ -81,7 +81,7 @@ To begin using SceneMagic, follow these steps to set up a basic transition:
    ```
    - Attach this function to a button or event.
 
-#### Advanced Example: Using Hooks for Custom Actions
+### Advanced Example: Using Hooks for Custom Actions
 
 1. **Scene Setup**:
    - Add elements to your scenes with `magic` classes for matching in Tumult Hype.
@@ -122,7 +122,7 @@ To begin using SceneMagic, follow these steps to set up a basic transition:
 
 ---
 
-### Tips for Effective Transitions
+## Tips for Effective Transitions
 
 - **Consistent Naming**: Ensure that elements you want to animate have consistent class names across scenes, prefixed with `magic`.
 - **Easing Functions**: Experiment with different easing functions (`easein`, `easeout`, `easeinout`) to achieve the desired effect.
