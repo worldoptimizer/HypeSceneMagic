@@ -1,86 +1,130 @@
-# Hype Scene Magic
+### Tumult Hype SceneMagic 2.3.1 Documentation
 
-## Overview
+#### Overview
 
-Hype SceneMagic is a high-performance JavaScript extension crafted to bring the ease and sophistication of Keynote's "Magic Move" transitions into the realm of Tumult Hype projects. With a focus on delivering visually captivating scene transitions, it bridges the gap between the effortless animations found in presentation software and the often complex world of web development.
+**SceneMagic** is a powerful tool for creating visually stunning scene transitions within Tumult Hype. Inspired by the fluid animations and seamless transitions introduced by Steve Jobs in Apple's Keynote presentations, SceneMagic harnesses the potential of web animations to enhance performance and interactivity. Whether you're creating simple animations or complex transitions, SceneMagic offers a versatile set of tools to bring your content to life.
 
-### Keynote Inspiration:
+---
 
-If you've ever used Keynote's "Magic Move" transition, you know how it can make objects elegantly glide from one slide to the next. Objects on the first slide automatically find their corresponding counterparts on the next slide and smoothly animate to their new positions. It's a feature that offers both aesthetic and narrative continuity.
+### Getting Started
 
-### Hype SceneMagic's Answer:
+To begin using SceneMagic, follow these steps to set up a basic transition:
 
-In a similar fashion, Hype SceneMagic identifies "magical" elements within your current and target scenes, performing a visually seamless transition based on pre-defined attributes like `top`, `left`, `width`, `height`, `rotateZ`, `scaleX`, `scaleY`, and `opacity`. Just like in Keynote, you don't have to manually script each object's movement between scenes—SceneMagic does it for you.
+#### Step-by-Step Guide
 
-#### Technical Highlights:
+1. **Add SceneMagic Script to Your Project**:
+   - Open the **Head HTML** section of your Tumult Hype document.
+   - Add the following script to include SceneMagic:
+     ```html
+     <script src="${resourcesFolderName}/HypeSceneMagic.js"></script>
+     ```
 
-1. **Seamless Integration**: Designed to work out-of-the-box with Tumult Hype's native JavaScript API.
+2. **Define Elements with Magic Classes**:
+   - In Tumult Hype, create the elements you want to animate between scenes.
+   - Assign them a class name starting with `magic`, followed by a keyword that will be used to match elements across scenes.
+   - To do this, select the element in Tumult Hype, go to the **Identity Inspector**, and set the **Class Name** field. For example, set the class name to `magicBox` or `magicElement1`.
 
-2. **Auto-Mapping**: Automatically locates and matches elements across scenes based on class identifiers.
+3. **Create Transition Functions**:
+   - Define functions to trigger transitions using Hype's JavaScript API. Here are examples of functions to go to specific scenes with different effects:
 
-3. **User Experience**: Implements a click-prevention mechanism during transitions to avoid accidental interactions.
+---
 
-4. **Easing Control**: Allows you to specify custom easing functions to get just the right visual effect.
+### Examples
 
-By offering a streamlined API with automatic magic transition capabilities, Hype SceneMagic empowers you to create presentations and web experiences that are as engaging as they are effortless, echoing the convenience and sophistication of Keynote's transitions in a web-centric context.
+#### Simple Example: Fade Transition
 
-## Version History
+1. **Scene Setup**:
+   - Create two scenes in Tumult Hype.
+   - In Scene 1, create an element and set its class to `magicBox`. Adjust its properties like opacity and position in the **Metrics Inspector**.
+   - In Scene 2, create a similar element with the same class name `magicBox` but with different properties.
 
-- 2.0: Major rewrite, now released under the MIT license.
-- 2.1: Added examples showcasing the head inclusion and Hype CommandPipeline compatibility.
-- 2.2: Minor bug fixes and turned into a self-contained extension.
+   For example:
+   - **Scene 1**: 
+     - Opacity: 1
+     - Position: Top 50px, Left 50px
+   - **Scene 2**: 
+     - Opacity: 0.5
+     - Position: Top 100px, Left 100px
 
-## Installation
+   SceneMagic will animate the transition between these states, giving the illusion of a single object transforming between scenes.
 
-To install Hype SceneMagic, include the `HypeSceneMagic.js` file within the head section of your HTML or directly inside your Tumult Hype project.
+2. **Go to Scene with Fade Transition**:
+   ```javascript
+   function goToScene2(hypeDocument, element, event) {
+       hypeDocument.showSceneNamedMagic('Scene 2', 1.0, 'easeinout');
+   }
+   ```
+   - Attach this function to a button or event to trigger the transition.
 
-```html
-<script src="path/to/HypeSceneMagic.js"></script>
-```
+#### Intermediate Example: Slide Transition
 
-## API
+1. **Scene Setup**:
+   - Similar to the simple example, create two scenes and add elements with `magic` classes in Tumult Hype.
+   - In Scene 1, create an element and set its class to `magicSlide`. Adjust its properties like opacity and position in the **Metrics Inspector**.
+   - In Scene 2, create a similar element with the same class name `magicSlide` but with different properties.
 
-### `hypeDocument.showSceneNamedMagic(targetSceneName, duration, ease)`
+   For example:
+   - **Scene 1**: 
+     - Opacity: 1
+     - Position: Top 50px, Left 50px
+   - **Scene 2**: 
+     - Opacity: 0.5
+     - Position: Top 100px, Left 100px
 
-Transitions to a named scene with the specified duration and easing function.
+   SceneMagic will slide these elements into their new positions.
 
-### `hypeDocument.showNextSceneMagic(duration, ease)`
+2. **Go to Scene with Slide Transition**:
+   ```javascript
+   function goToScene2WithSlide(hypeDocument, element, event) {
+       hypeDocument.showSceneNamedMagic('Scene 2', 1.5, 'easein');
+   }
+   ```
+   - Attach this function to a button or event.
 
-Moves to the next scene in the queue, applying the magic transition.
+#### Advanced Example: Using Hooks for Custom Actions
 
-### `hypeDocument.showPreviousSceneMagic(duration, ease)`
+1. **Scene Setup**:
+   - Add elements to your scenes with `magic` classes for matching in Tumult Hype.
+   - In Scene 1, create an element and set its class to `magicElement`. Adjust its properties like opacity and position in the **Metrics Inspector**.
+   - In Scene 2, create a similar element with the same class name `magicElement` but with different properties.
 
-Moves to the previous scene in the queue with the magic transition.
+   For example:
+   - **Scene 1**: 
+     - Opacity: 1
+     - Position: Top 50px, Left 50px
+   - **Scene 2**: 
+     - Opacity: 0.5
+     - Position: Top 100px, Left 100px
 
-## Getting Started
+   SceneMagic will animate the transition between these states.
 
-To get started with Hype SceneMagic, follow these steps:
+2. **Go to Scene with Hooks**:
+   ```javascript
+   function goToScene2WithHooks(hypeDocument, element, event) {
+       let hooks = {
+           beforeStart: function(currentScene, targetScene, options) {
+               // Bring current element to the front
+               let currentElement = currentScene.querySelector('.magicElement');
+               if (currentElement) {
+                   currentElement.style.zIndex = 9999; // Bring to front
+               }
+               console.log("Transition starting...");
+           },
+           afterEnd: function(currentScene, targetScene, options) {
+               // do something with elements and options
+               console.log("Transition ended.");
+           }
+       };
+       hypeDocument.showSceneNamedMagic('Scene 2', 2.0, 'easeinout', hooks);
+   }
+   ```
+   - Attach this function to an event to observe the hooks in action.
 
-1. Include the `HypeSceneMagic.js` in your HTML or Hype project.
-2. Use the API functions within your Hype scene's JavaScript actions or in your external scripts.
+---
 
-## Usage
+### Tips for Effective Transitions
 
-Basic example to show a named scene with magic transition:
-
-```javascript
-hypeDocument.showSceneNamedMagic('Scene2', 1.0, 'easeinout');
-```
-
-## FAQ
-
-### How do I integrate Hype SceneMagic in existing projects?
-
-Simply include the script and start calling the API methods in your Hype project.
-
-### Does it work with mobile browsers?
-
-Yes, Hype SceneMagic is designed to work across all major desktop and mobile browsers.
-
-## License
-
-This project is licensed under the MIT License. Please see the [LICENSE.md](LICENSE.md) file for more details.
-
-## Contact
-
-For further inquiries, feel free to reach out or visit the [official documentation](https://maxziebell.de).
+- **Consistent Naming**: Ensure that elements you want to animate have consistent class names across scenes, prefixed with `magic`.
+- **Easing Functions**: Experiment with different easing functions (`easein`, `easeout`, `easeinout`) to achieve the desired effect.
+- **Duration**: Adjust the duration of your transitions to make them feel natural and smooth.
+- **Debugging**: Use browser console logs in hooks to debug and fine-tune your transitions.
