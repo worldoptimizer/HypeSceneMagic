@@ -1,4 +1,4 @@
-### Tumult Hype SceneMagic 2.3.1 Documentation
+# Hype Scene Magic 
 
 #### Overview
 
