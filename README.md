@@ -1,8 +1,25 @@
 # Hype Scene Magic 
 
-### Overview
+
+![HypeSceneMagic|](https://playground.maxziebell.de/Hype/SceneMagic/HypeSceneMagic.jpg)
 
 **Hype Scene Magic** is a powerful tool for creating visually stunning scene transitions within Tumult Hype. Inspired by the fluid animations and seamless transitions introduced by Steve Jobs in Apple's Keynote presentations, SceneMagic harnesses the potential of web animations to enhance performance and interactivity. Whether you're creating simple animations or complex transitions, SceneMagic offers a versatile set of tools to bring your content to life.
+
+
+---
+
+### Content Delivery Network (CDN)
+
+The latest version of SceneMagic can be linked into your project using the following in the head section of your project:
+
+```html
+<script src="https://cdn.jsdelivr.net/gh/worldoptimizer/HypeSceneMagic/HypeSceneMagic.min.js"></script>
+```
+
+Optionally, you can also link a SRI version or specific releases. Read more about that on the JsDelivr (CDN) page for this extension at [https://www.jsdelivr.com/package/gh/worldoptimizer/HypeSceneMagic](https://www.jsdelivr.com/package/gh/worldoptimizer/HypeSceneMagic).
+
+Learn how to use the latest extension version and how to combine extensions into one file at [https://github.com/worldoptimizer/HypeCookBook/wiki/Including-external-files-and-Hype-extensions](https://github.com/worldoptimizer/HypeCookBook/wiki/Including-external-files-and-Hype-extensions).
+
 
 ---
 
