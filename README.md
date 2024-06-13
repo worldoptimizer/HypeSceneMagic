@@ -1,7 +1,7 @@
 # Hype Scene Magic 
 
 
-![HypeSceneMagic|](https://playground.maxziebell.de/Hype/SceneMagic/HypeSceneMagic.jpg)
+![HypeSceneMagic|](https://playground.maxziebell.de/Hype/SceneMagic/HypeSceneMagic.jpg?)
 
 **Hype Scene Magic** is a powerful tool for creating visually stunning scene transitions within Tumult Hype. Inspired by the fluid animations and seamless transitions introduced by Steve Jobs in Apple's Keynote presentations, SceneMagic harnesses the potential of web animations to enhance performance and interactivity. Whether you're creating simple animations or complex transitions, SceneMagic offers a versatile set of tools to bring your content to life.
 
