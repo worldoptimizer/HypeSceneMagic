@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.3.1
+ * Hype SceneMagic 2.3.2
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  */
 
@@ -11,6 +11,7 @@
  * ---
  * 2.3.0 Code improvements based on feedback
  * 2.3.1 Added hooks support for afterEnd and beforeStart
+ * 2.3.2 Fixed sceneLoad autoplay and added magicTransition behavior
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {
@@ -212,6 +213,8 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                 }
 
                 this.showSceneNamed(targetSceneName, this.kSceneTransitionInstant);
+                this.pauseTimelineNamed('timelineName');
+                this.triggerCustomBehaviorNamed('magicTransition');
 
                 currentSceneElm.style.display = 'block';
 
@@ -301,7 +304,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
     window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 
     return {
-        version: '2.3.1',
+        version: '2.3.2',
         getDefault: getDefault,
         setDefault: setDefault,
     };
