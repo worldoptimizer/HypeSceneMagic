@@ -1,3 +1,4 @@
+
 # Hype Scene Magic 
 
 
@@ -43,6 +44,51 @@ To begin using SceneMagic, follow these steps to set up a basic transition:
 
 3. **Create Transition Functions**:
    - Define functions to trigger transitions using Hype's JavaScript API. Here are examples of functions to go to specific scenes with different effects:
+
+---
+
+## New Data-Transition Attributes
+
+To enhance the flexibility and control of transitions, several new `data-transition` attributes have been introduced:
+
+| Attribute                   | Description                                                            | Example Values                |
+|-----------------------------|------------------------------------------------------------------------|-------------------------------|
+| `data-transition-id`        | Assigns a unique identifier to elements for matching between scenes.    | `example1`, `box`, `item123`  |
+| `data-transition-delay`     | Specifies the delay before the transition starts, in percentage of the total duration. | `0`, `10`, `50`               |
+| `data-transition-duration`  | Defines the duration of the transition, in percentage of the total duration. | `100`, `75`, `50`             |
+| `data-transition-order`     | Controls the z-index order during the transition. Accepts `front`, `back`, or a specific number. | `front`, `back`, `10`         |
+
+### Special Note
+
+- **`target`**: The keyword `target` can be used with the `data-transition-delay`, `data-transition-duration`, and `data-transition-order` attributes to inherit values from the target element. This allows for dynamic adjustments based on the properties of the element being transitioned to.
+
+---
+
+## Transition Modes
+
+SceneMagic now supports two transition modes: **direct** and **indirect**. The default mode is **indirect**.
+
+### Indirect Mode (Default)
+
+In indirect mode, the delay and duration are calculated based on the total duration of the transition, ensuring that both the delay and the transition time fit within the overall time.
+
+### Direct Mode
+
+In direct mode, the delay is applied first, and then the transition duration follows, allowing for more precise control over the timing of each part of the transition.
+
+### How to Change the Transition Mode
+
+You can change the transition mode globally by using the `setDefault` function.
+
+```javascript
+HypeSceneMagic.setDefault('transitionMode', 'direct');
+```
+
+Or revert to the default **indirect** mode:
+
+```javascript
+HypeSceneMagic.setDefault('transitionMode', 'indirect');
+```
 
 ---
 
