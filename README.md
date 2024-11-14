@@ -10,12 +10,14 @@
 ---
 
 ### Content Delivery Network (CDN)
-
-The latest version of SceneMagic can be linked into your project using the following in the head section of your project:
+To link the latest version of SceneMagic into your project, add the following to the `<head>` section of your HTML:
 
 ```html
+<script src="https://cdn.jsdelivr.net/npm/gsap@latest/dist/gsap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/worldoptimizer/HypeSceneMagic/HypeSceneMagic.min.js"></script>
 ```
+
+This will ensure both GSAP and SceneMagic are included in your project with the latest stable versions.
 
 Optionally, you can also link a SRI version or specific releases. Read more about that on the JsDelivr (CDN) page for this extension at [https://www.jsdelivr.com/package/gh/worldoptimizer/HypeSceneMagic](https://www.jsdelivr.com/package/gh/worldoptimizer/HypeSceneMagic).
 
