@@ -32,10 +32,13 @@ To begin using SceneMagic, follow these steps to set up a basic transition:
 
 ### Step-by-Step Guide
 
-1. **Add SceneMagic Script to Your Project**:
-   - Open the **Head HTML** section of your Tumult Hype document.
-   - Add the following script to include SceneMagic:
+1. **Add SceneMagic and GSAP Scripts to Your Project**:
+   - First, download both the `HypeSceneMagic.js` and the latest `gsap.min.js` files and add them to your project’s **Resources** folder in Tumult Hype.
+   - Then, open the **Head HTML** section of your Tumult Hype document.
+   - Add the following script tags to include both **SceneMagic** and **GSAP** locally:
+
      ```html
+     <script src="${resourcesFolderName}/gsap.min.js"></script>
      <script src="${resourcesFolderName}/HypeSceneMagic.js"></script>
      ```
 
