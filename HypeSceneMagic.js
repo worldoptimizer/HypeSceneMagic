@@ -1,7 +1,7 @@
-/*!
- * Hype SceneMagic 2.5.2 (GSAP Version)
+*!
+ * Hype SceneMagic 2.5.3 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
- * Adapted for GSAP by [Your Name/Organization]
+ * Requires GSAP animation library (https://greensock.com/gsap/)
  */
 
 /*
@@ -9,7 +9,8 @@
  * 2.5.0 Adapted to use GSAP instead of Web Animations API
  * 2.5.1 Fixed id bug supporting multiple layouts (use the same name for layouts)
  * 2.5.2 Added support for data-transition-fallback attributes when magic pair is not matched
- *       Unified and cleaned up parsing, and added more documentation. 
+ *       Unified and cleaned up parsing, and added more documentation.
+ * 2.5.3 Added data-transition-fallback-from/to for fine-grained directional transitions
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {
@@ -394,6 +395,10 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                 const targetMagicElms = targetSceneElm.querySelectorAll('div[class*="magic"], div[data-transition-id]');
                 const sourceMagicElms = currentSceneElm.querySelectorAll('div[class*="magic"], div[data-transition-id]');
 
+                // Store initial states for elements with fallback-to animations
+                const initialStates = new Map();
+
+                // Handle elements in target scene
                 targetMagicElms.forEach(targetElement => {
                     const targetId = getTransitionIdentifier(targetElement);
                     if (targetId) {
@@ -405,8 +410,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                         if (sourceElement) {
                             animateTransition(targetElement, sourceElement, duration, ease);
                         } else {
-                            // Check for fallback animation data
-                            const fallbackAnimation = targetElement.getAttribute('data-transition-fallback');
+                            // Check for fallback animation data - fallback-from takes precedence
+                            const fallbackAnimation = targetElement.getAttribute('data-transition-fallback-from') || 
+                                                    targetElement.getAttribute('data-transition-fallback');
                             if (fallbackAnimation) {
                                 const animationData = parseSimpleAnimation(fallbackAnimation);
                                 if (animationData) {
@@ -420,6 +426,49 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                                         duration: timing.duration,
                                         delay: timing.delay,
                                         ease: animationData.ease || getEase(ease)
+                                    });
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Handle elements in source scene that aren't in target scene
+                sourceMagicElms.forEach(sourceElement => {
+                    const sourceId = getTransitionIdentifier(sourceElement);
+                    if (sourceId) {
+                        const targetElement = Array.from(targetMagicElms).find(el => {
+                            const targetId = getTransitionIdentifier(el);
+                            return targetId && targetId.toLowerCase() === sourceId.toLowerCase();
+                        });
+
+                        if (!targetElement) {
+                            // Check for fallback-to animation
+                            const fallbackToAnimation = sourceElement.getAttribute('data-transition-fallback-to') || 
+                                                      sourceElement.getAttribute('data-transition-fallback');
+                            if (fallbackToAnimation) {
+                                const animationData = parseSimpleAnimation(fallbackToAnimation);
+                                if (animationData) {
+                                    // Store initial state
+                                    initialStates.set(sourceElement, { ...getProperties(sourceElement) });
+
+                                    const delayPercentage = parseFloat(sourceElement.getAttribute('data-transition-delay') || '0');
+                                    const durationPercentage = parseFloat(sourceElement.getAttribute('data-transition-duration') || '100');
+                                    
+                                    const timing = calculateTimingValues(delayPercentage, durationPercentage, duration);
+
+                                    gsap.to(sourceElement, {
+                                        ...animationData,
+                                        duration: timing.duration,
+                                        delay: timing.delay,
+                                        ease: animationData.ease || getEase(ease),
+                                        onComplete: () => {
+                                            // Reset to initial state
+                                            const initialState = initialStates.get(sourceElement);
+                                            if (initialState) {
+                                                gsap.set(sourceElement, initialState);
+                                            }
+                                        }
                                     });
                                 }
                             }
@@ -492,7 +541,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
     window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 
     return {
-        version: '2.5.2',
+        version: '2.5.3',
         getDefault: getDefault,
         setDefault: setDefault,
     };
