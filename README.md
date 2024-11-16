@@ -43,9 +43,9 @@ Configure element transitions through the following attributes, set in the **Att
 | `data-transition-delay`     | Delay before transition starts, as a percentage of total duration.                                 | `0`, `10`, `50`               |
 | `data-transition-duration`  | Duration of transition, as a percentage of total duration.                                         | `100`, `75`, `50`             |
 | `data-transition-order`     | Z-index order during transition (`front` places element in front, `back` places it behind).        | `front`, `back`, `10`         |
-| `data-transition-fallback`  | Fallback animation for unmatched elements (e.g., fade-in, move down).                              | `opacity:0; transform:translateY(100px)` |
+| `data-transition-fallback`  | Fallback animation for unmatched elements (e.g., fade-in, move down relative).                     | `opacity:0; x:+=100` |
 | `data-transition-fallback-from` | Fallback animation applied to unmatched elements in the **current** scene during transitions.   | `opacity:0; scale:0.5`        |
-| `data-transition-fallback-to`   | Fallback animation applied to unmatched elements in the **target** scene during transitions.    | `opacity:0; translateX(50px)` |
+| `data-transition-fallback-to`   | Fallback animation applied to unmatched elements in the **target** scene during transitions.    | `opacity:0;  x:100` |
 
 ### Special `target` Keyword
 
