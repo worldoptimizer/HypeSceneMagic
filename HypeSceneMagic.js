@@ -1,7 +1,7 @@
 /*!
  * Hype SceneMagic 2.5.3 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
- * Requires GSAP animation library (https://greensock.com/gsap/)
+ * Requires the GSAP animation library (https://greensock.com/gsap/)
  */
 
 /*
