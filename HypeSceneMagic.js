@@ -1,13 +1,15 @@
 /*!
- * Hype SceneMagic 2.5.1 (GSAP Version)
+ * Hype SceneMagic 2.5.2 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
- * Adapted for GSAP (this version requires GSAP to be loaded)
+ * Adapted for GSAP by [Your Name/Organization]
  */
 
 /*
  * Version-History
  * 2.5.0 Adapted to use GSAP instead of Web Animations API
  * 2.5.1 Fixed id bug supporting multiple layouts (use the same name for layouts)
+ * 2.5.2 Added support for data-transition-fallback attributes when magic pair is not matched
+ *       Unified and cleaned up parsing, and added more documentation. 
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {
@@ -38,6 +40,12 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         transitionMode: 'indirect'
     };
 
+    /**
+     * Sets default configuration values for HypeSceneMagic
+     * @param {(string|Object)} key - Either a string key or an object containing multiple key-value pairs
+     * @param {*} [value] - The value to set if key is a string
+     * @returns {void}
+     */
     function setDefault(key, value) {
         if (typeof(key) == 'object') {
             _default = key;
@@ -46,11 +54,21 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         _default[key] = value;
     }
 
+    /**
+     * Gets default configuration values from HypeSceneMagic
+     * @param {string} [key] - Optional key to get specific default value
+     * @returns {*} The entire default object if no key provided, otherwise the value for the specified key
+     */
     function getDefault(key) {
         if (!key) return _default;
         return _default[key];
     }
 
+    /**
+     * Gets computed style properties for an element with fallback to default values
+     * @param {HTMLElement} element - The element to get properties for
+     * @returns {Object} Object containing style properties with their computed or default values
+     */
     function getProperties(element) {
         let properties = {};
         let defaultProperties = getDefault('defaultProperties');
@@ -60,11 +78,21 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         return properties;
     }
 
+    /**
+     * Gets the mapped easing function name based on the provided ease string
+     * @param {string} [ease='power1.inOut'] - The easing function name to map
+     * @returns {string} The mapped easing function name from easingMap or the original ease if no mapping exists
+     */
     function getEase(ease) {
         ease = ease || 'power1.inOut';
         return getDefault('easingMap')[ease.toLowerCase()] || ease;
     }
 
+    /**
+     * Finds the appropriate element to apply z-index to, checking if parent is a HYPE container
+     * @param {HTMLElement} element - The element to check
+     * @returns {HTMLElement} Either the parent container element or the original element
+     */
     function findZIndexElement(element) {
         if (element.parentElement && element.parentElement.classList.contains('HYPE_element_container')) {
             return element.parentElement;
@@ -72,6 +100,12 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         return element;
     }
 
+    /**
+     * Determines the appropriate z-index value based on the order parameter
+     * @param {HTMLElement} element - The element to determine z-index for
+     * @param {string|number} order - Either 'front', 'back' or a specific z-index value
+     * @returns {string} The calculated z-index value as a string
+     */
     function determineZIndex(element, order) {
         if (order === 'front' || order === 'back') {
             const siblings = Array.from(element.parentElement.children);
@@ -85,9 +119,41 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                 return (minZ - 1).toString();
             }
         }
-        return order; // If it's a number or any other value, return as is
+        return order;
     }
 
+    /**
+     * Calculates timing values for transitions based on percentages and total duration
+     * @param {number} delayPercentage - Delay percentage (0-100)
+     * @param {number} durationPercentage - Duration percentage (0-100) 
+     * @param {number} totalDuration - Total transition duration in seconds
+     * @returns {Object} Object containing calculated delay and duration
+     */
+    function calculateTimingValues(delayPercentage, durationPercentage, totalDuration) {
+        const normalizedDelay = delayPercentage / 100;
+        const normalizedDuration = durationPercentage / 100;
+        const delay = normalizedDelay * totalDuration;
+
+        if (getDefault('transitionMode') === 'direct') {
+            return {
+                delay,
+                duration: Math.max(0, Math.min(totalDuration - delay, totalDuration * normalizedDuration))
+            };
+        }
+        
+        return {
+            delay,
+            duration: (totalDuration - delay) * normalizedDuration
+        };
+    }
+
+    /**
+     * Animates a transition between two elements with configurable timing and properties
+     * @param {HTMLElement} targetElement - The element to transition to
+     * @param {HTMLElement} originElement - The element to transition from 
+     * @param {number} totalDuration - Total duration of the transition in seconds
+     * @param {string} ease - Easing function to use for the transition
+     */
     function animateTransition(targetElement, originElement, totalDuration, ease) {
         const fromProperties = getProperties(originElement);
         const toProperties = getProperties(targetElement);
@@ -100,18 +166,10 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             return sourceValue || defaultValue;
         }
 
-        const delayPercentage = Math.max(0, Math.min(1, parseFloat(getAttributeValue('data-transition-delay', '0')) / 100));
-        const durationPercentage = Math.max(0, Math.min(1, parseFloat(getAttributeValue('data-transition-duration', '100')) / 100));
+        const delayPercentage = parseFloat(getAttributeValue('data-transition-delay', '0'));
+        const durationPercentage = parseFloat(getAttributeValue('data-transition-duration', '100'));
         
-        let delay, actualDuration;
-
-        if (getDefault('transitionMode') === 'direct') {
-            delay = delayPercentage * totalDuration;
-            actualDuration = Math.max(0, Math.min(totalDuration - delay, totalDuration * durationPercentage));
-        } else {
-            delay = delayPercentage * totalDuration;
-            actualDuration = (totalDuration - delay) * durationPercentage;
-        }
+        const timing = calculateTimingValues(delayPercentage, durationPercentage, totalDuration);
 
         const transitionOrder = getAttributeValue('data-transition-order', null);
         let zIndexElement = null;
@@ -125,41 +183,37 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         decomposeTransform(fromProperties);
         decomposeTransform(toProperties);
 
-        // GSAP Timeline for the transition
         const tl = gsap.timeline();
 
-        // Animate from origin to target
         tl.fromTo(targetElement, fromProperties, {
             ...toProperties,
-            duration: actualDuration,
+            duration: timing.duration,
             ease: getEase(ease),
-            delay: delay,
+            delay: timing.delay,
             onComplete: () => {
                 if (zIndexElement) {
                     gsap.set(zIndexElement, { clearProps: 'zIndex' });
                 }
-                gsap.set(originElement, fromProperties); // Reset to original state
+                gsap.set(originElement, fromProperties);
             }
         });
 
-        
-        // Animate origin element
         const originTween = gsap.fromTo(originElement, fromProperties, {
             ...toProperties,
-            duration: actualDuration,
+            duration: timing.duration,
             ease: getEase(ease),
-            delay: delay,
-            onComplete: () => {
-               
-            }
+            delay: timing.delay,
+            onComplete: () => {}
         });
 
-        tl.add(originTween, 0); // Add to main timeline, start at the same time as target animation
-
-        // Pause the origin animation at 50% progress
-        tl.call(() => originTween.pause(), [], actualDuration / 2);
+        tl.add(originTween, 0);
+        tl.call(() => originTween.pause(), [], timing.duration / 2);
     }
 
+    /**
+     * Decomposes transform string into individual transform properties
+     * @param {Object} properties - Object containing CSS properties including transform
+     */
     function decomposeTransform(properties) {
         const transform = properties.transform || '';
         const decomposed = {
@@ -198,12 +252,16 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             }
         }
     
-        // Remove the original transform property and assign decomposed properties
         delete properties.transform;
         Object.assign(properties, decomposed);
     }
-    
 
+    /**
+     * Adds CSS styles to disable pointer events during magic transitions.
+     * Creates a style element with id 'magicTransitionStyle' if it doesn't already exist
+     * and appends it to the document head.
+     * @returns {void}
+     */
     function addMagicTransitionCSS() {
         if (!document.getElementById('magicTransitionStyle')) {
             let style = document.createElement('style');
@@ -213,6 +271,11 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         }
     }
 
+    /**
+     * Gets the transition identifier from an element, either from a data attribute or CSS class
+     * @param {HTMLElement} element - The DOM element to get the transition identifier from
+     * @returns {string|null} The transition identifier if found, null otherwise
+     */
     function getTransitionIdentifier(element) {
         const dataId = element.getAttribute('data-transition-id');
         if (dataId) return dataId;
@@ -226,10 +289,58 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         return null;
     }
 
+    /**
+     * Parses a string of animation properties into an object
+     * @param {string} dataString - String containing animation properties in format "prop1:value1;prop2:value2"
+     * @returns {Object|null} Animation object with parsed properties and values, or null if no data
+     */
+    function parseSimpleAnimation(dataString) {
+        if (!dataString) return null;
+        
+        const properties = dataString.split(';').filter(Boolean);
+        const animation = {};
+        const blacklist = ['delay', 'duration'];
+        const percentageProps = ['scale', 'scaleX', 'scaleY', 'scaleZ'];
+        
+        properties.forEach(prop => {
+            const [key, value] = prop.trim().split(':').map(s => s.trim());
+            
+            if (blacklist.includes(key)) {
+                console.info(`Property '${key}' is not allowed in fallback animations`);
+                return;
+            }
+            
+            // Handle percentage values for scale properties
+            if (percentageProps.includes(key) && value.endsWith('%')) {
+                animation[key] = parseFloat(value) / 100;
+            } else {
+                // Pass other values directly to GSAP for parsing
+                animation[key] = value;
+            }
+        });
+        
+        return animation;
+    }
+
+    /**
+     * Main document load handler for Hype Scene Magic functionality
+     * @param {Object} hypeDocument - The Hype document instance
+     * @param {HTMLElement} element - The document element
+     * @param {Event} event - The load event
+     */
     function HypeDocumentLoad(hypeDocument, element, event) {
         const hypeDocElm = element;
         addMagicTransitionCSS();
 
+        /**
+         * Shows a scene with magic transition effects
+         * @param {string} targetSceneName - Name of the scene to transition to
+         * @param {number} [duration=0.5] - Duration of the transition in seconds
+         * @param {string} [ease] - Easing function to use
+         * @param {Object} [hooks] - Transition lifecycle hooks
+         * @param {Function} [hooks.beforeStart] - Called before transition starts
+         * @param {Function} [hooks.afterEnd] - Called after transition completes
+         */
         hypeDocument.showSceneNamedMagic = function(targetSceneName, duration, ease, hooks) {
             
             hooks = hooks || {};
@@ -262,7 +373,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             // Get scene elements using correct indices
             const currentSceneElm = document.querySelector(`#${this.documentId()} > [hype_scene_index="${currentSceneIdx}"]`);
             const targetSceneElm = document.querySelector(`#${this.documentId()} > [hype_scene_index="${targetSceneIdx}"]`);
-         
 
             duration = duration || 0.5;
 
@@ -294,6 +404,25 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
                         if (sourceElement) {
                             animateTransition(targetElement, sourceElement, duration, ease);
+                        } else {
+                            // Check for fallback animation data
+                            const fallbackAnimation = targetElement.getAttribute('data-transition-fallback');
+                            if (fallbackAnimation) {
+                                const animationData = parseSimpleAnimation(fallbackAnimation);
+                                if (animationData) {
+                                    const delayPercentage = parseFloat(targetElement.getAttribute('data-transition-delay') || '0');
+                                    const durationPercentage = parseFloat(targetElement.getAttribute('data-transition-duration') || '100');
+                                    
+                                    const timing = calculateTimingValues(delayPercentage, durationPercentage, duration);
+
+                                    gsap.from(targetElement, {
+                                        ...animationData,
+                                        duration: timing.duration,
+                                        delay: timing.delay,
+                                        ease: animationData.ease || getEase(ease)
+                                    });
+                                }
+                            }
                         }
                     }
                 });
@@ -313,6 +442,12 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             }
         }
 
+        /**
+         * Shows the next scene with magic transition effects
+         * @param {number} [duration] - Duration of the transition in seconds
+         * @param {string} [ease] - Easing function to use
+         * @param {Object} [hooks] - Transition lifecycle hooks
+         */
         hypeDocument.showNextSceneMagic = function(duration, ease, hooks) {
             const scenes = this.sceneNames();
             const currentSceneIdx = scenes.indexOf(this.currentSceneName());
@@ -322,6 +457,12 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             }
         }
 
+        /**
+         * Shows the previous scene with magic transition effects
+         * @param {number} [duration] - Duration of the transition in seconds
+         * @param {string} [ease] - Easing function to use
+         * @param {Object} [hooks] - Transition lifecycle hooks
+         */
         hypeDocument.showPreviousSceneMagic = function(duration, ease, hooks) {
             const scenes = this.sceneNames();
             const currentSceneIdx = scenes.indexOf(this.currentSceneName());
@@ -331,6 +472,13 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             }
         }
 
+        /**
+         * Event handler to check if scene magic transition is running
+         * @param {Object} hypeDocument - The Hype document instance
+         * @param {HTMLElement} element - The document element
+         * @param {Event} event - The event object
+         * @returns {boolean} True if scene magic is not running, false otherwise
+         */
         function runningSceneMagic(hypeDocument, element, event) {
             if (hypeDocElm == element) return !hypeDocument.running_SceneMagic;
         }
@@ -344,7 +492,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
     window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 
     return {
-        version: '2.5.1',
+        version: '2.5.2',
         getDefault: getDefault,
         setDefault: setDefault,
     };
