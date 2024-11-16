@@ -47,8 +47,18 @@ Configure element transitions through the following attributes, set in the **Att
 | `data-transition-fallback-from` | Fallback animation applied to unmatched elements in the **current** scene during transitions.   | `opacity:0; scale:0.5`        |
 | `data-transition-fallback-to`   | Fallback animation applied to unmatched elements in the **target** scene during transitions.    | `opacity:0; translateX(50px)` |
 
-#### Special `target` Keyword
-Use `target` in attributes like `data-transition-delay`, `data-transition-duration`, and `data-transition-order` to inherit values from the target element.
+### Special `target` Keyword
+
+The `target` keyword allows certain attributes like `data-transition-delay`, `data-transition-duration`, and `data-transition-order` to dynamically inherit their values from the corresponding element in the target scene. If the target element does not define the attribute, a default or fallback value is used.
+
+This feature ensures that elements can adapt their transition behavior based on the target scene, providing more flexibility and control.
+
+For example:
+- **`data-transition-delay="target"`**: Inherits the delay percentage from the target element.
+- **`data-transition-duration="target"`**: Uses the duration percentage from the target element.
+- **`data-transition-order="target"`**: Synchronizes the stacking order with the target element for consistent layering.
+
+The `target` keyword simplifies complex transitions by making elements responsive to their counterparts in the next scene.
 
 ---
 
