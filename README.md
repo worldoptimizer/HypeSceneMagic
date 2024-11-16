@@ -1,17 +1,14 @@
-Here’s an updated README reflecting the latest capabilities of **Hype Scene Magic**:
-
----
-
 # Hype Scene Magic 
 
-![HypeSceneMagic|](https://playground.maxziebell.de/Hype/SceneMagic/HypeSceneMagic.jpg?)
+![HypeSceneMagic](https://playground.maxziebell.de/Hype/SceneMagic/HypeSceneMagic.jpg?)
 
 **Hype Scene Magic** is a powerful tool for creating visually stunning scene transitions within Tumult Hype. Inspired by Apple's Keynote animations, SceneMagic utilizes GSAP to enhance animation performance and interactivity. Whether you're crafting simple animations or complex transitions, SceneMagic offers a robust set of tools to elevate your content.
 
 ---
 
-### Content Delivery Network (CDN)
-To link SceneMagic into your project, add the following to the `<head>` section:
+## Content Delivery Network (CDN)
+
+To link SceneMagic into your project, add the following to the **Head HTML**:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/gsap@latest/dist/gsap.min.js"></script>
@@ -24,48 +21,46 @@ For specific releases, refer to [JsDelivr SceneMagic](https://www.jsdelivr.com/p
 
 ## Getting Started
 
-### Step-by-Step Guide
+### Step 1: Add Resources
+Include the GSAP and Hype Scene Magic libraries in the **Head HTML** of your Tumult Hype project.
 
-1. **Add SceneMagic and GSAP Scripts**:
-   - Download `HypeSceneMagic.js` and `gsap.min.js`, add them to the **Resources** folder in Tumult Hype, and include these in the **Head HTML** section:
-     ```html
-     <script src="${resourcesFolderName}/gsap.min.js"></script>
-     <script src="${resourcesFolderName}/HypeSceneMagic.js"></script>
-     ```
-
-2. **Define Elements with `magic` Classes**:
-   - Assign elements a `magic` class prefix to enable SceneMagic’s animations across scenes, e.g., `magicBox`.
-
-3. **Create Transition Functions**:
-   - Define JavaScript functions to trigger specific transitions using SceneMagic’s extended API.
+### Step 2: Apply Magic Transitions
+Assign `magic` prefixed class names or `data-transition` attributes to elements. These attributes are configured via the **Attribute Panel** to define animation behavior across scenes.
 
 ---
 
-## Data-Transition Attributes
+## Core Features
 
-New `data-transition` attributes offer fine control over animations:
+### Magic Class Names
+Use `magic` prefixed class names for elements to enable SceneMagic animations. For instance, use `magicBox` or `magicCircle` to apply transitions.
 
-| Attribute                   | Description                                      | Example Values        |
-|-----------------------------|--------------------------------------------------|-----------------------|
-| `data-transition-id`        | Unique identifier for element matching           | `example1`, `box`     |
-| `data-transition-delay`     | Delay before transition (in % of total duration) | `0`, `10`, `50`       |
-| `data-transition-duration`  | Duration of transition (in % of total duration)  | `100`, `75`, `50`     |
-| `data-transition-order`     | Z-index during transition (`front` or `back`)    | `front`, `back`, `10` |
+### Transition Attributes
+Configure element transitions through the following attributes, set in the **Attribute Panel**:
 
-**Special `target` Keyword**: In attributes like `data-transition-delay`, `data-transition-duration`, and `data-transition-order`, the `target` keyword allows values to inherit from the target element.
+| Attribute                   | Description                                                                                         | Example Values                |
+|-----------------------------|-----------------------------------------------------------------------------------------------------|--------------------------------|
+| `data-transition-id`        | Unique identifier for matching elements between scenes.                                            | `example1`, `box`             |
+| `data-transition-delay`     | Delay before transition starts, as a percentage of total duration.                                 | `0`, `10`, `50`               |
+| `data-transition-duration`  | Duration of transition, as a percentage of total duration.                                         | `100`, `75`, `50`             |
+| `data-transition-order`     | Z-index order during transition (`front` places element in front, `back` places it behind).        | `front`, `back`, `10`         |
+| `data-transition-fallback`  | Fallback animation for unmatched elements (e.g., fade-in, move down).                              | `opacity:0; transform:translateY(100px)` |
+| `data-transition-fallback-from` | Fallback animation applied to unmatched elements in the **current** scene during transitions.   | `opacity:0; scale:0.5`        |
+| `data-transition-fallback-to`   | Fallback animation applied to unmatched elements in the **target** scene during transitions.    | `opacity:0; translateX(50px)` |
+
+#### Special `target` Keyword
+Use `target` in attributes like `data-transition-delay`, `data-transition-duration`, and `data-transition-order` to inherit values from the target element.
 
 ---
 
 ## Transition Modes
 
-SceneMagic now supports **direct** and **indirect** transition modes. By default, it operates in **indirect** mode.
+SceneMagic supports two modes of operation:
 
-- **Indirect Mode**: Delays and duration align with the total transition duration.
-- **Direct Mode**: Applies delay first, followed by transition duration.
+- **Indirect Mode (Default)**: Delays and durations are relative to the total transition duration.
+- **Direct Mode**: Applies delays and durations sequentially (delay first, then transition).
 
-### Changing Transition Mode
-
-Set the transition mode globally:
+### Changing Transition Modes
+You can set the transition mode globally using the `setDefault` method:
 
 ```javascript
 HypeSceneMagic.setDefault('transitionMode', 'direct'); // Direct Mode
@@ -74,19 +69,17 @@ HypeSceneMagic.setDefault('transitionMode', 'indirect'); // Indirect Mode
 
 ---
 
-## Advanced Usage
+## Advanced Options
 
-### Pausing and Adjusting Z-Index During Animations
+### Lifecycle Hooks
+SceneMagic provides hooks for custom logic during transitions:
 
-SceneMagic’s `animateTransition` now dynamically determines element z-index based on the `data-transition-order` attribute. Elements can be moved to the front or back based on their z-order, ensuring seamless animations.
+| Hook           | Description                             |
+|----------------|-----------------------------------------|
+| `beforeStart`  | Executes before the transition begins.  |
+| `afterEnd`     | Executes after the transition completes.|
 
----
-
-## Examples
-
-### Using Hooks for Preparing and Cleaning Up before and after a Transitions
-
-Define custom behaviors at the beginning or end of transitions:
+Define behaviors using these hooks:
 
 ```javascript
 function goToSceneWithHooks(hypeDocument, element, event) {
@@ -98,16 +91,34 @@ function goToSceneWithHooks(hypeDocument, element, event) {
             console.log("Transition ended.");
         }
     };
-    hypeDocument.showSceneNamedMagic('Scene 2', 2.0, 'easeinout', hooks);
+    hypeDocument.showSceneNamedMagic('Scene2', 2.0, 'easeinout', hooks);
 }
 ```
 
 ---
 
-## Debugging and Tips
+## Easing Options
 
-- **Use Hooks**: Hooks (`beforeStart`, `afterEnd`) provide custom entry/exit actions during transitions.
-- **Consistent Naming**: Ensure consistent `magic` class names for smooth transitions.
-- **Debugging**: Use `console.log` within hooks to monitor transition points and properties.
-- **Duration Adjustments**: Experiment with `data-transition-duration` for natural, smooth animations.
+### Mapped Easing Names
+SceneMagic maps Tumult Hype easing names to GSAP equivalents, ensuring consistency:
 
+| **Hype Easing** | **GSAP Equivalent**   |
+|------------------|-----------------------|
+| `easein`         | `power1.in`          |
+| `easeout`        | `power1.out`         |
+| `easeinout`      | `power1.inOut`       |
+
+### Using GSAP Easing
+You can use any GSAP easing directly for advanced transitions:
+
+| **GSAP Easing** | Description                                       |
+|------------------|---------------------------------------------------|
+| `bounce.out`     | Adds a bounce effect to the transition's end.     |
+| `elastic.in`     | Creates an elastic effect at the start.           |
+| `back.inOut`     | Smooth curve with overshooting both ends.         |
+
+ [Read more about GSAP easing functions here](https://greensock.com/docs/v3/Eases) 
+
+---
+
+With these features and tools, you can use Hype Scene Magic to create engaging, dynamic animations in Tumult Hype with ease.
