@@ -82,7 +82,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         if (element) {
             _initialPropertiesCache.delete(element);
         } else {
-            _initialPropertiesCache = new WeakMap();
+            _initialPropertiesCache.clear();
         }
     }
 
@@ -194,32 +194,15 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         if (!document.getElementById('magicTransitionStyle')) {
             let style = document.createElement('style');
             style.id = 'magicTransitionStyle';
-            style.textContent = `
-                .magicTransition, .magicTransition * {
-                    pointer-events: none !important;
-                }
-                .magicTransition > .HYPE_scene {
-                    transform: none !important;
-                }
-                .magicTransition > .HYPE_scene.currentScene {
-                    z-index: 1 !important;
-                    display: block !important;
-                }
-                .magicTransition > .HYPE_scene.targetScene {
-                    z-index: 2 !important;
-                    display: block !important;
-                    opacity: var(--scene-opacity, 0) !important;
-                }
-                .magicTransition > .HYPE_document > .HYPE_element_container {
-                    z-index: 1000 !important;
-                }
-                .magicTransition > .HYPE_scene.currentScene.fadeComplete {
-                    display: none !important;
-                }
-                .magicTransition > .HYPE_scene.targetScene.fadeComplete {
-                    opacity: 1 !important;
-                }
-            `;
+            style.textContent = [
+                '.magicTransition, .magicTransition * { pointer-events: none !important; }',
+                '.magicTransition > .HYPE_scene { transform: none !important; }',
+                '.magicTransition > .HYPE_scene.currentScene { z-index: 1 !important; display: block !important; }',
+                '.magicTransition > .HYPE_scene.targetScene { z-index: 2 !important; display: block !important; opacity: var(--scene-opacity, 0) !important; }',
+                '.magicTransition > .HYPE_document > .HYPE_element_container { z-index: 1000 !important; }',
+                '.magicTransition > .HYPE_scene.currentScene.fadeComplete { display: none !important; }',
+                '.magicTransition > .HYPE_scene.targetScene.fadeComplete { opacity: 1 !important; }'
+            ].join('');
             document.head.appendChild(style);
         }
     }
@@ -271,16 +254,10 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         
         const properties = dataString.split(';').filter(Boolean);
         const animation = {};
-        const blacklist = [];
         const percentageProps = ['scale', 'scaleX', 'scaleY', 'scaleZ'];
         
         properties.forEach(prop => {
             const [key, value] = prop.trim().split(':').map(s => s.trim());
-            
-            if (blacklist.includes(key)) {
-                console.info(`Property '${key}' is not allowed in fallback animations`);
-                return;
-            }
             
             // Handle percentage values for scale properties
             if (percentageProps.includes(key) && value.endsWith('%')) {
