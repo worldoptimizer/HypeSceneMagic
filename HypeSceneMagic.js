@@ -552,14 +552,16 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
          * Shows the next scene with magic transition effects
          * @param {number} [duration] - Duration of the transition in seconds
          * @param {string} [ease] - Easing function to use
-         * @param {Object} [hooks] - Transition lifecycle hooks
+         * @param {Object} [options] - Additional options for the transition
+         * @param {Function} [options.beforeStart] - Called before transition starts
+         * @param {Function} [options.afterEnd] - Called after transition completes
          */
-        hypeDocument.showNextSceneMagic = function(duration, ease, hooks) {
+        hypeDocument.showNextSceneMagic = function(duration, ease, options) {
             const scenes = this.sceneNames();
             const currentSceneIdx = scenes.indexOf(this.currentSceneName());
             const nextSceneName = scenes[currentSceneIdx + 1];
             if (nextSceneName != null) {
-                hypeDocument.showSceneNamedMagic(nextSceneName, duration, ease, hooks);
+                hypeDocument.showSceneNamedMagic(nextSceneName, duration, ease, options);
             }
         }
 
@@ -567,14 +569,16 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
          * Shows the previous scene with magic transition effects
          * @param {number} [duration] - Duration of the transition in seconds
          * @param {string} [ease] - Easing function to use
-         * @param {Object} [hooks] - Transition lifecycle hooks
+         * @param {Object} [options] - Additional options for the transition
+         * @param {Function} [options.beforeStart] - Called before transition starts
+         * @param {Function} [options.afterEnd] - Called after transition completes
          */
-        hypeDocument.showPreviousSceneMagic = function(duration, ease, hooks) {
+        hypeDocument.showPreviousSceneMagic = function(duration, ease, options) {
             const scenes = this.sceneNames();
             const currentSceneIdx = scenes.indexOf(this.currentSceneName());
             const previousSceneName = scenes[currentSceneIdx - 1];
             if (previousSceneName != null) {
-                hypeDocument.showSceneNamedMagic(previousSceneName, duration, ease, hooks);
+                hypeDocument.showSceneNamedMagic(previousSceneName, duration, ease, options);
             }
         }
 
