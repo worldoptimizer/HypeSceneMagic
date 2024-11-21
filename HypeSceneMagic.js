@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.5.3 (GSAP Version)
+ * Hype SceneMagic 2.5.5 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -11,6 +11,10 @@
  * 2.5.2 Added support for data-transition-fallback attributes when magic pair is not matched
  *       Unified and cleaned up parsing, and added more documentation.
  * 2.5.3 Added data-transition-fallback-from/to for fine-grained directional transitions
+ * 2.5.4 Removed the indirect transition mode as it was too complex and unintuitive
+ *       Refactored to use a native Hype crossfade transition, but overridden with the magicTransition class
+ *       Added z-index management for proper scene layering during transitions
+ * 2.5.5 Added support for runtime transition mapping and made identifiers case-insensitive
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {
@@ -38,8 +42,49 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             letterSpacing: 'normal',
             textDecoration: 'none',
         },
-        transitionMode: 'indirect'
+        crossFadeFactor: 0.5,
+        duration: 0.5
     };
+
+    // Add WeakMap for storing initial properties
+    const _initialPropertiesCache = new WeakMap();
+
+    /**
+     * Gets computed style properties for an element with caching
+     * @param {HTMLElement} element - The element to get properties for
+     * @param {boolean} [force=false] - Force recalculation of properties
+     * @returns {Object} Object containing style properties
+     */
+    function getCachedMagicProperties(element, force = false) {
+        // Check cache first
+        if (!force && _initialPropertiesCache.has(element)) {
+            return _initialPropertiesCache.get(element);
+        }
+
+        // Calculate properties
+        let properties = {};
+        let defaultProperties = getDefault('defaultProperties');
+        for (let key in defaultProperties) {
+            properties[key] = element.style[key] || defaultProperties[key];
+        }
+
+        // Store in cache
+        _initialPropertiesCache.set(element, properties);
+        
+        return properties;
+    }
+
+    /**
+     * Clears the cached properties for an element or all cached properties if no element is provided
+     * @param {HTMLElement} [element] - Optional element to clear cache for. If not provided, clears entire cache
+     */
+    function clearCachedMagicProperties(element) {
+        if (element) {
+            _initialPropertiesCache.delete(element);
+        } else {
+            _initialPropertiesCache = new WeakMap();
+        }
+    }
 
     /**
      * Sets default configuration values for HypeSceneMagic
@@ -63,20 +108,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
     function getDefault(key) {
         if (!key) return _default;
         return _default[key];
-    }
-
-    /**
-     * Gets computed style properties for an element with fallback to default values
-     * @param {HTMLElement} element - The element to get properties for
-     * @returns {Object} Object containing style properties with their computed or default values
-     */
-    function getProperties(element) {
-        let properties = {};
-        let defaultProperties = getDefault('defaultProperties');
-        for (let key in defaultProperties) {
-            properties[key] = element.style[key] || defaultProperties[key];
-        }
-        return properties;
     }
 
     /**
@@ -124,137 +155,33 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
     }
 
     /**
-     * Calculates timing values for transitions based on percentages and total duration
-     * @param {number} delayPercentage - Delay percentage (0-100)
-     * @param {number} durationPercentage - Duration percentage (0-100) 
+     * Calculates timing values for transitions based on percentages/factors and total duration
+     * @param {string|number} delayValue - Delay as percentage (with %), factor, or time value (s/ms)
+     * @param {string|number} durationValue - Duration as percentage (with %), factor, or time value (s/ms)
      * @param {number} totalDuration - Total transition duration in seconds
-     * @returns {Object} Object containing calculated delay and duration
+     * @returns {Object} Object containing calculated delay and duration in seconds
      */
-    function calculateTimingValues(delayPercentage, durationPercentage, totalDuration) {
-        const normalizedDelay = delayPercentage / 100;
-        const normalizedDuration = durationPercentage / 100;
-        const delay = normalizedDelay * totalDuration;
-
-        if (getDefault('transitionMode') === 'direct') {
-            return {
-                delay,
-                duration: Math.max(0, Math.min(totalDuration - delay, totalDuration * normalizedDuration))
-            };
-        }
-        
-        return {
-            delay,
-            duration: (totalDuration - delay) * normalizedDuration
-        };
-    }
-
-    /**
-     * Animates a transition between two elements with configurable timing and properties
-     * @param {HTMLElement} targetElement - The element to transition to
-     * @param {HTMLElement} originElement - The element to transition from 
-     * @param {number} totalDuration - Total duration of the transition in seconds
-     * @param {string} ease - Easing function to use for the transition
-     */
-    function animateTransition(targetElement, originElement, totalDuration, ease) {
-        const fromProperties = getProperties(originElement);
-        const toProperties = getProperties(targetElement);
-
-        function getAttributeValue(attr, defaultValue) {
-            let sourceValue = originElement.getAttribute(attr);
-            if (sourceValue === 'target') {
-                return targetElement.getAttribute(attr) || defaultValue;
-            }
-            return sourceValue || defaultValue;
-        }
-
-        const delayPercentage = parseFloat(getAttributeValue('data-transition-delay', '0'));
-        const durationPercentage = parseFloat(getAttributeValue('data-transition-duration', '100'));
-        
-        const timing = calculateTimingValues(delayPercentage, durationPercentage, totalDuration);
-
-        const transitionOrder = getAttributeValue('data-transition-order', null);
-        let zIndexElement = null;
-
-        if (transitionOrder !== null) {
-            zIndexElement = findZIndexElement(targetElement);
-            const newZIndex = determineZIndex(zIndexElement, transitionOrder);
-            gsap.set(zIndexElement, { zIndex: newZIndex });
-        }
-
-        decomposeTransform(fromProperties);
-        decomposeTransform(toProperties);
-
-        const tl = gsap.timeline();
-
-        tl.fromTo(targetElement, fromProperties, {
-            ...toProperties,
-            duration: timing.duration,
-            ease: getEase(ease),
-            delay: timing.delay,
-            onComplete: () => {
-                if (zIndexElement) {
-                    gsap.set(zIndexElement, { clearProps: 'zIndex' });
+    function calculateTimingValues(delayValue, durationValue, totalDuration) {
+        const calculateValue = (value) => {
+            if (typeof value === 'string') {
+                if (value.endsWith('%')) {
+                    // Handle percentage values (e.g., "50%")
+                    return (parseFloat(value) / 100) * parseFloat(totalDuration);
+                } else if (value.endsWith('ms')) {
+                    // Handle millisecond values (e.g., "500ms")
+                    return parseFloat(value) / 1000;
+                } else if (value.endsWith('s')) {
+                    // Handle second values (e.g., "0.5s")
+                    return parseFloat(value);
                 }
-                gsap.set(originElement, fromProperties);
             }
-        });
-
-        const originTween = gsap.fromTo(originElement, fromProperties, {
-            ...toProperties,
-            duration: timing.duration,
-            ease: getEase(ease),
-            delay: timing.delay,
-            onComplete: () => {}
-        });
-
-        tl.add(originTween, 0);
-        tl.call(() => originTween.pause(), [], timing.duration / 2);
-    }
-
-    /**
-     * Decomposes transform string into individual transform properties
-     * @param {Object} properties - Object containing CSS properties including transform
-     */
-    function decomposeTransform(properties) {
-        const transform = properties.transform || '';
-        const decomposed = {
-            translateX: 0,
-            translateY: 0,
-            translateZ: 0,
-            rotate: 0,
-            rotateX: 0,
-            rotateY: 0,
-            rotateZ: 0,
-            scaleX: 1,
-            scaleY: 1,
+            // Handle factor values (e.g., 0.5)
+            return parseFloat(value) * parseFloat(totalDuration);
         };
-    
-        const regex = /(\w+)\(([^)]+)\)/g;
-        let match;
-        
-        while ((match = regex.exec(transform)) !== null) {
-            const [_, prop, value] = match;
-            const values = value.split(',').map(v => parseFloat(v));
-            switch (prop) {
-                case 'translateX': decomposed.translateX = values[0]; break;
-                case 'translateY': decomposed.translateY = values[0]; break;
-                case 'translateZ': decomposed.translateZ = values[0]; break;
-                case 'rotate': decomposed.rotate = values[0]; break;
-                case 'rotateX': decomposed.rotateX = values[0]; break;
-                case 'rotateY': decomposed.rotateY = values[0]; break;
-                case 'rotateZ': decomposed.rotateZ = values[0]; break;
-                case 'scaleX': decomposed.scaleX = values[0]; break;
-                case 'scaleY': decomposed.scaleY = values[0]; break;
-                case 'scaleZ': decomposed.scaleZ = values[0]; break;
-                case 'scale': 
-                    decomposed.scaleX = values[0];
-                    decomposed.scaleY = values.length > 1 ? values[1] : values[0];
-                    break;
-            }
-        }
-    
-        delete properties.transform;
-        Object.assign(properties, decomposed);
+
+        const delay = calculateValue(delayValue);
+        const duration = calculateValue(durationValue);
+        return { delay, duration };
     }
 
     /**
@@ -267,27 +194,71 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         if (!document.getElementById('magicTransitionStyle')) {
             let style = document.createElement('style');
             style.id = 'magicTransitionStyle';
-            style.textContent = `.magicTransition, .magicTransition * {pointer-events:none !important;}`;
+            style.textContent = `
+                .magicTransition, .magicTransition * {
+                    pointer-events: none !important;
+                }
+                .magicTransition > .HYPE_scene {
+                    transform: none !important;
+                }
+                .magicTransition > .HYPE_scene.currentScene {
+                    z-index: 1 !important;
+                    display: block !important;
+                }
+                .magicTransition > .HYPE_scene.targetScene {
+                    z-index: 2 !important;
+                    display: block !important;
+                    opacity: var(--scene-opacity, 0) !important;
+                }
+                .magicTransition > .HYPE_document > .HYPE_element_container {
+                    z-index: 1000 !important;
+                }
+                .magicTransition > .HYPE_scene.currentScene.fadeComplete {
+                    display: none !important;
+                }
+                .magicTransition > .HYPE_scene.targetScene.fadeComplete {
+                    opacity: 1 !important;
+                }
+            `;
             document.head.appendChild(style);
         }
     }
 
     /**
-     * Gets the transition identifier from an element, either from a data attribute or CSS class
+     * Extracts the magic identifier from an element's class list
+     * @param {HTMLElement} element - The element to check
+     * @returns {string|null} The identifier portion of the magic class, or null if not found
+     */
+    function extractMagicIdentifier(element) {
+        for (let className of element.classList) {
+            if (className.toLowerCase().startsWith('magic') && className.length > 5) {
+                return className.slice(5).toLowerCase();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Gets the transition identifier from an element
      * @param {HTMLElement} element - The DOM element to get the transition identifier from
      * @returns {string|null} The transition identifier if found, null otherwise
      */
     function getTransitionIdentifier(element) {
-        const dataId = element.getAttribute('data-transition-id');
-        if (dataId) return dataId;
-    
-        for (let className of element.classList) {
-            if (className.startsWith('magic') && className.length > 5) {
-                return className.slice(5).toLowerCase();
-            }
+        // Try to get identifier from class first
+        let identifier = extractMagicIdentifier(element);
+        
+        // If no class identifier found, check data attribute
+        if (!identifier) {
+            identifier = element.getAttribute('data-transition-id');
         }
-    
-        return null;
+        
+        // Remove 'magic' prefix if present and convert to lowercase
+        if (identifier && identifier.toLowerCase().startsWith('magic')) {
+            identifier = identifier.slice(5);
+        }
+        
+        // Return lowercase identifier or null if none found
+        return identifier ? identifier.toLowerCase() : null;
     }
 
     /**
@@ -300,7 +271,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         
         const properties = dataString.split(';').filter(Boolean);
         const animation = {};
-        const blacklist = ['delay', 'duration'];
+        const blacklist = [];
         const percentageProps = ['scale', 'scaleX', 'scaleY', 'scaleZ'];
         
         properties.forEach(prop => {
@@ -336,18 +307,23 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         /**
          * Shows a scene with magic transition effects
          * @param {string} targetSceneName - Name of the scene to transition to
-         * @param {number} [duration=0.5] - Duration of the transition in seconds
+         * @param {number} [duration] - Duration of the transition in seconds
          * @param {string} [ease] - Easing function to use
-         * @param {Object} [hooks] - Transition lifecycle hooks
-         * @param {Function} [hooks.beforeStart] - Called before transition starts
-         * @param {Function} [hooks.afterEnd] - Called after transition completes
+         * @param {Object} [options] - Additional options for the transition
+         * @param {number} [options.crossFadeFactor] - Custom cross fade factor (0-1)
+         * @param {Function} [options.beforeStart] - Called before transition starts
+         * @param {Function} [options.afterEnd] - Called after transition completes
          */
-        hypeDocument.showSceneNamedMagic = function(targetSceneName, duration, ease, hooks) {
-            
-            hooks = hooks || {};
-            const scenes = this.sceneNames();
+        hypeDocument.showSceneNamedMagic = function(targetSceneName, duration, ease, options = {}) {
+            // Return if we are currently running a transition
+            if (hypeDocElm.classList.contains('magicTransition')) return;
+
+            // Get current scene and layout names
             const currentSceneName = this.currentSceneName();
             const currentLayoutName = this.currentLayoutName();
+            
+            // Avoid unnecessary calculations if target scene is the same as the current scene
+            if (targetSceneName === currentSceneName) return;
             
             // Get current layout info
             const currentLayouts = this.layoutsForSceneNamed(currentSceneName);
@@ -375,58 +351,174 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             const currentSceneElm = document.querySelector(`#${this.documentId()} > [hype_scene_index="${currentSceneIdx}"]`);
             const targetSceneElm = document.querySelector(`#${this.documentId()} > [hype_scene_index="${targetSceneIdx}"]`);
 
-            duration = duration || 0.5;
+            duration = duration || getDefault('duration');
+            const crossFadeFactor = options.crossFadeFactor !== undefined ? options.crossFadeFactor : getDefault('crossFadeFactor');
+            const crossFadeDuration = duration * crossFadeFactor;
 
             if (targetSceneElm != null) {
-                this.running_SceneMagic = true;
-                
+                // Add magicTransition class to hypeDocElm to disable pointer events
                 hypeDocElm.classList.add('magicTransition');
 
-                if (hooks.beforeStart) {
-                    hooks.beforeStart(currentSceneElm, targetSceneElm, { duration, ease });
+                // Add scene-specific classes for z-index management
+                currentSceneElm.classList.add('currentScene');
+                targetSceneElm.classList.add('targetScene');
+
+                // Call beforeStart hook if provided
+                if (options.beforeStart) {
+                    options.beforeStart(currentSceneElm, targetSceneElm, { duration, ease });
                 }
 
-                this.showSceneNamed(targetSceneName, this.kSceneTransitionInstant);
-                this.pauseTimelineNamed('timelineName');
+                // Use swap transition but prohibit default behavior with magicTransition class
+                hypeDocument.showSceneNamed(targetSceneName, hypeDocument.kSceneTransitionCrossfade, duration);
+                
+                // Create a timeline to manage all animations
+                const masterTimeline = gsap.timeline({
+                    onComplete: () => {
+                        // Reset properties for all elements that need restoration
+                        elementsToRestore.forEach(element => {
+                            const initialProps = getCachedMagicProperties(element);
+                            gsap.set(element, initialProps);
+                        });
+
+                        // Clean up classes
+                        hypeDocElm.classList.remove('magicTransition');
+                        currentSceneElm.classList.remove('currentScene', 'fadeComplete');
+                        targetSceneElm.classList.remove('targetScene', 'fadeComplete');
+                        
+                        if (options.afterEnd) {
+                            options.afterEnd(currentSceneElm, targetSceneElm, { duration, ease });
+                        }
+                    }
+                });
+
+                // Fade in the target scene with GSAP (no easing)
+                masterTimeline.fromTo(targetSceneElm, 
+                    { '--scene-opacity': 0 },
+                    { 
+                        '--scene-opacity': 1,
+                        duration: crossFadeDuration,
+                        ease: "none",
+                        onComplete: () => {
+                            currentSceneElm.classList.add('fadeComplete');
+                            targetSceneElm.classList.add('fadeComplete');
+                        }
+                    }
+                );
+
+                // Kill any running animations in current scene after crossfade to improve performance
+                masterTimeline.call(() => {
+                    gsap.killTweensOf(currentSceneElm.querySelectorAll('*'));
+                }, null, crossFadeDuration);
+                
+                // todo: check if this is needed anymore by checking if it still has an effect
                 this.triggerCustomBehaviorNamed('magicTransition');
 
-                currentSceneElm.style.display = 'block';
-
+                // Get all magic elements in target and source scenes
                 const targetMagicElms = targetSceneElm.querySelectorAll('div[class*="magic"], div[data-transition-id]');
                 const sourceMagicElms = currentSceneElm.querySelectorAll('div[class*="magic"], div[data-transition-id]');
 
-                // Store initial states for elements with fallback-to animations
-                const initialStates = new Map();
+                // Store references to elements that need restoration
+                const elementsToRestore = new Set();
 
-                // Handle elements in target scene
+                // Handle elements in target scene that are also in source scene
                 targetMagicElms.forEach(targetElement => {
                     const targetId = getTransitionIdentifier(targetElement);
+                    
+                    // If element has a transition identifier, it's a magic element
                     if (targetId) {
+                        // Find matching element in source scene
                         const sourceElement = Array.from(sourceMagicElms).find(el => {
                             const sourceId = getTransitionIdentifier(el);
                             return sourceId && sourceId.toLowerCase() === targetId.toLowerCase();
                         });
 
+                        // If matching element is found, animate transition
                         if (sourceElement) {
-                            animateTransition(targetElement, sourceElement, duration, ease);
+                            // Add source element to restore list
+                            elementsToRestore.add(sourceElement);
+                            
+                            // Get and cache initial properties of both elements
+                            const fromProperties = getCachedMagicProperties(sourceElement);
+                            const toProperties = getCachedMagicProperties(targetElement);
+
+                            // Helper function to get attribute value from source or target element
+                            function getAttributeValue(attr, defaultValue) {
+                                let sourceValue = sourceElement.getAttribute(attr);
+                                if (sourceValue === 'target') {
+                                    return targetElement.getAttribute(attr) || defaultValue;
+                                }
+                                return sourceValue || defaultValue;
+                            }
+
+                            // Get transition attributes
+                            const delayPercentage = getAttributeValue('data-transition-delay', 0);
+                            const durationPercentage = getAttributeValue('data-transition-duration', 1);
+                            const transitionOrder = getAttributeValue('data-transition-order', null);
+
+                            // Calculate timing values
+                            const timing = calculateTimingValues(delayPercentage, durationPercentage, duration);
+
+                            // Get easing from target element or use default
+                            const easing = getAttributeValue('data-transition-ease', ease);
+
+                            // Handle transition stacking order
+                            let zIndexElement = null;
+
+                            if (transitionOrder !== null) {
+                                zIndexElement = findZIndexElement(targetElement);
+                                const newZIndex = determineZIndex(zIndexElement, transitionOrder);
+                                gsap.set(zIndexElement, { zIndex: newZIndex });
+                            }
+
+                            // Create a nested timeline for this element pair
+                            const elementTimeline = gsap.timeline({
+                                onComplete: () => {
+                                    if (zIndexElement) {
+                                        gsap.set(zIndexElement, { clearProps: 'zIndex' });
+                                    }
+                                }
+                            });
+
+                            // Add fromTo tweens to element timeline
+                            elementTimeline.fromTo(targetElement, fromProperties, {
+                                ...toProperties,
+                                duration: timing.duration,
+                                ease: getEase(easing)
+                            }, timing.delay);
+
+                            elementTimeline.fromTo(sourceElement, fromProperties, {
+                                ...toProperties,
+                                duration: timing.duration,
+                                ease: getEase(easing)
+                            }, timing.delay);
+
+                            // Add element timeline to master timeline
+                            masterTimeline.add(elementTimeline, 0);
+                            
                         } else {
-                            // Check for fallback animation data - fallback-from takes precedence
-                            const fallbackAnimation = targetElement.getAttribute('data-transition-fallback-from') || 
-                                                    targetElement.getAttribute('data-transition-fallback');
+                            // Check for data-transition-fallback-from and data-transition-fallback animation data
+                            const fallbackAnimation = targetElement.getAttribute('data-transition-fallback-from') || targetElement.getAttribute('data-transition-fallback');
+
+                            // If fallback animation data is found, parse and animate
                             if (fallbackAnimation) {
                                 const animationData = parseSimpleAnimation(fallbackAnimation);
                                 if (animationData) {
-                                    const delayPercentage = parseFloat(targetElement.getAttribute('data-transition-delay') || '0');
-                                    const durationPercentage = parseFloat(targetElement.getAttribute('data-transition-duration') || '100');
-                                    
+                                    // Get initial properties to make sure they are cached
+                                    getCachedMagicProperties(targetElement);
+
+                                    const delayPercentage = targetElement.getAttribute('data-transition-delay') || 0;
+                                    const durationPercentage = targetElement.getAttribute('data-transition-duration') || 1;
                                     const timing = calculateTimingValues(delayPercentage, durationPercentage, duration);
 
-                                    gsap.from(targetElement, {
-                                        ...animationData,
+                                    // Get easing from target element or use default
+                                    const easing = targetElement.getAttribute('data-transition-ease') || ease;
+
+                                    // Add fallback animation to master timeline
+                                    masterTimeline.from(targetElement, {
                                         duration: timing.duration,
-                                        delay: timing.delay,
-                                        ease: animationData.ease || getEase(ease)
-                                    });
+                                        ease: getEase(easing),
+                                        ...animationData
+                                    }, timing.delay);
                                 }
                             }
                         }
@@ -437,55 +529,43 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                 sourceMagicElms.forEach(sourceElement => {
                     const sourceId = getTransitionIdentifier(sourceElement);
                     if (sourceId) {
+                        // Find matching element in target scene
                         const targetElement = Array.from(targetMagicElms).find(el => {
                             const targetId = getTransitionIdentifier(el);
                             return targetId && targetId.toLowerCase() === sourceId.toLowerCase();
                         });
 
+                        // If matching element is found, animate transition
                         if (!targetElement) {
-                            // Check for fallback-to animation
-                            const fallbackToAnimation = sourceElement.getAttribute('data-transition-fallback-to') || 
-                                                      sourceElement.getAttribute('data-transition-fallback');
+                            elementsToRestore.add(sourceElement);
+                            
+                            // Check for data-transition-fallback-to and data-transition-fallback animation data
+                            const fallbackToAnimation = sourceElement.getAttribute('data-transition-fallback-to') || sourceElement.getAttribute('data-transition-fallback');
+                            
+                            // If fallback-to animation data is found, parse and animate
                             if (fallbackToAnimation) {
                                 const animationData = parseSimpleAnimation(fallbackToAnimation);
+                                
                                 if (animationData) {
-                                    // Store initial state
-                                    initialStates.set(sourceElement, { ...getProperties(sourceElement) });
-
-                                    const delayPercentage = parseFloat(sourceElement.getAttribute('data-transition-delay') || '0');
-                                    const durationPercentage = parseFloat(sourceElement.getAttribute('data-transition-duration') || '100');
+                                    // Get initial properties to make sure they are cached
+                                    getCachedMagicProperties(sourceElement);
                                     
+                                    const delayPercentage = sourceElement.getAttribute('data-transition-delay') || 0;
+                                    const durationPercentage = sourceElement.getAttribute('data-transition-duration') || 1;
                                     const timing = calculateTimingValues(delayPercentage, durationPercentage, duration);
 
-                                    gsap.to(sourceElement, {
-                                        ...animationData,
+                                    // Get easing from target element or use default
+                                    const easing = sourceElement.getAttribute('data-transition-ease') || ease;
+
+                                    // Add fallback animation to master timeline
+                                    masterTimeline.to(sourceElement, {
                                         duration: timing.duration,
-                                        delay: timing.delay,
-                                        ease: animationData.ease || getEase(ease),
-                                        onComplete: () => {
-                                            // Reset to initial state
-                                            const initialState = initialStates.get(sourceElement);
-                                            if (initialState) {
-                                                gsap.set(sourceElement, initialState);
-                                            }
-                                        }
-                                    });
+                                        ease: getEase(easing),
+                                        ...animationData,
+                                    }, timing.delay);
                                 }
                             }
                         }
-                    }
-                });
-
-                gsap.fromTo(targetSceneElm, { opacity: 0 }, { opacity: 1, duration: duration / 2, ease: 'linear' });
-
-                gsap.delayedCall(duration, () => {
-                    currentSceneElm.style.display = 'none';
-                    hypeDocElm.classList.remove('magicTransition');
-                    this.running_SceneMagic = false;
-                    this.showSceneNamed(targetSceneName, this.kSceneTransitionInstant);
-
-                    if (hooks.afterEnd) {
-                        hooks.afterEnd(currentSceneElm, targetSceneElm, { duration, ease });
                     }
                 });
             }
@@ -521,28 +601,16 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             }
         }
 
-        /**
-         * Event handler to check if scene magic transition is running
-         * @param {Object} hypeDocument - The Hype document instance
-         * @param {HTMLElement} element - The document element
-         * @param {Event} event - The event object
-         * @returns {boolean} True if scene magic is not running, false otherwise
-         */
-        function runningSceneMagic(hypeDocument, element, event) {
-            if (hypeDocElm == element) return !hypeDocument.running_SceneMagic;
-        }
-
-        hypeDocument.running_SceneMagic = false;
-        window.HYPE_eventListeners.push({"type": "HypeSceneLoad", "callback": runningSceneMagic });
-        window.HYPE_eventListeners.push({ "type": "HypeSceneUnload", "callback": runningSceneMagic });
     }
 
     if ("HYPE_eventListeners" in window === false) window.HYPE_eventListeners = Array();
     window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 
     return {
-        version: '2.5.3',
-        getDefault: getDefault,
-        setDefault: setDefault,
+        version: '2.5.5',
+        getDefault,
+        setDefault,
+        clearCachedMagicProperties,
+        extractMagicIdentifier
     };
 })();
