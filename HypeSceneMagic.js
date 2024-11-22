@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.5.7 (GSAP Version)
+ * Hype SceneMagic 2.5.8 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -20,6 +20,11 @@
  * 2.5.7 Added onTransitionProgress callback to track overall transition progress
  *       Added custom behaviors: magicTransitionStart/End, magicTransition_{fromScene}_to_{toScene},
  *       magicTransitionFrom_{fromScene}, magicTransitionTo_{toScene} (scene names without spaces)
+ * 2.5.8 Added support for data-transition-animation on non-magic elements
+ *       Added data-transition-animation-from/to for directional animations
+ *       Renamed fallback to animation in attribute names for consistency
+ *       Added hypeDocument.applyAnimation() to apply registered and custom GSAP animations to elements
+ *       Added durationAnimation and refactored duration to durationTransition
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {
@@ -48,8 +53,21 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             textDecoration: 'none',
         },
         crossFadeFactor: 0.5,
-        duration: 0.5,
-        registeredAnimations: {}
+        durationTransition: 0.5,
+        durationAnimation: 0.25,
+        registeredAnimations: {},
+        hypePropertyMap: {
+            x: 'left',
+            y: 'top',
+            scale: ['scaleX', 'scaleY'],
+            scaleX: 'scaleX',
+            scaleY: 'scaleY',
+            rotation: 'rotateZ',
+            opacity: 'opacity',
+            width: 'width',
+            height: 'height',
+            zIndex: 'z-index'
+        }
     };
 
     // Add WeakMap for storing initial properties
@@ -359,7 +377,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             const currentSceneElm = document.querySelector(`#${this.documentId()} > [hype_scene_index="${currentSceneIdx}"]`);
             const targetSceneElm = document.querySelector(`#${this.documentId()} > [hype_scene_index="${targetSceneIdx}"]`);
 
-            duration = duration || getDefault('duration');
+            duration = duration || getDefault('durationTransition');
             const crossFadeFactor = options.crossFadeFactor !== undefined ? options.crossFadeFactor : getDefault('crossFadeFactor');
             const crossFadeDuration = duration * crossFadeFactor;
 
@@ -433,7 +451,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                 masterTimeline.call(() => {
                     gsap.killTweensOf(currentSceneElm.querySelectorAll('*'));
                 }, null, crossFadeDuration);
-
                 // Get all magic elements in target and source scenes
                 const targetMagicElms = targetSceneElm.querySelectorAll('div[class*="magic"], div[data-transition-id]');
                 const sourceMagicElms = currentSceneElm.querySelectorAll('div[class*="magic"], div[data-transition-id]');
@@ -517,21 +534,21 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                             masterTimeline.add(elementTimeline, 0);
                             
                         } else {
-                            // Check for data-transition-fallback-from and data-transition-fallback animation data
-                            const fallbackAnimation = targetElement.getAttribute('data-transition-fallback-from') || targetElement.getAttribute('data-transition-fallback');
+                            // Check for data-transition-animation and data-transition-animation-from animation data
+                            const animation = targetElement.getAttribute('data-transition-animation-from') || targetElement.getAttribute('data-transition-animation');
 
-                            // If fallback animation data is found, parse and animate
-                            if (fallbackAnimation) {
+                            // If animation data is found, parse and animate
+                            if (animation) {
                                 let animationData;
                                 
-                                // Check if fallbackAnimation is a registered animation name
-                                if (!fallbackAnimation.includes(':')) {
-                                    animationData = getRegisteredAnimation(fallbackAnimation);
+                                // Check if animation is a registered animation name
+                                if (!animation.includes(':')) {
+                                    animationData = getRegisteredAnimation(animation);
                                 }
                                 
                                 // If not a registered animation, parse as simple animation string
                                 if (!animationData) {
-                                    animationData = parseSimpleAnimation(fallbackAnimation);
+                                    animationData = parseSimpleAnimation(animation);
                                 }
 
                                 if (animationData) {
@@ -545,7 +562,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                                     // Get easing from target element or use default
                                     const easing = targetElement.getAttribute('data-transition-ease') || ease;
 
-                                    // Add fallback animation to master timeline
+                                    // Add animation to master timeline
                                     masterTimeline.from(targetElement, {
                                         duration: timing.duration,
                                         ease: getEase(easing),
@@ -571,21 +588,21 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                         if (!targetElement) {
                             elementsToRestore.add(sourceElement);
                             
-                            // Check for data-transition-fallback-to and data-transition-fallback animation data
-                            const fallbackToAnimation = sourceElement.getAttribute('data-transition-fallback-to') || sourceElement.getAttribute('data-transition-fallback');
+                            // Check for data-transition-animation-to and data-transition-animation animation data
+                            const animation = sourceElement.getAttribute('data-transition-animation-to') || sourceElement.getAttribute('data-transition-animation');
                             
-                            // If fallback-to animation data is found, parse and animate
-                            if (fallbackToAnimation) {
+                            // If animation data is found, parse and animate
+                            if (animation) {
                                 let animationData;
                                 
-                                // Check if fallbackToAnimation is a registered animation name
-                                if (!fallbackToAnimation.includes(':')) {
-                                    animationData = getRegisteredAnimation(fallbackToAnimation);
+                                // Check if animation is a registered animation name
+                                if (!animation.includes(':')) {
+                                    animationData = getRegisteredAnimation(animation);
                                 }
                                 
                                 // If not a registered animation, parse as simple animation string
                                 if (!animationData) {
-                                    animationData = parseSimpleAnimation(fallbackToAnimation);
+                                    animationData = parseSimpleAnimation(animation);
                                 }
                                 
                                 if (animationData) {
@@ -599,7 +616,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                                     // Get easing from target element or use default
                                     const easing = sourceElement.getAttribute('data-transition-ease') || ease;
 
-                                    // Add fallback animation to master timeline
+                                    // Add animation to master timeline
                                     masterTimeline.to(sourceElement, {
                                         duration: timing.duration,
                                         ease: getEase(easing),
@@ -610,6 +627,44 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                         }
                     }
                 });
+
+                // Helper function to handle animation for non-magic elements
+                const handleNonMagicAnimation = (element, isTarget) => {
+                    const animationType = isTarget ? 'from' : 'to';
+                    const animation = element.getAttribute(`data-transition-animation-${animationType}`) || 
+                                    element.getAttribute('data-transition-animation');
+                    
+                    if (animation) {
+                        let animationData = animation.includes(':') ? 
+                            parseSimpleAnimation(animation) : 
+                            getRegisteredAnimation(animation);
+
+                        if (animationData) {
+                            const delayPercentage = element.getAttribute('data-transition-delay') || 0;
+                            const durationPercentage = element.getAttribute('data-transition-duration') || 1;
+                            const timing = calculateTimingValues(delayPercentage, durationPercentage, duration);
+                            const easing = element.getAttribute('data-transition-ease') || ease;
+
+                            masterTimeline[isTarget ? 'from' : 'to'](element, {
+                                duration: timing.duration,
+                                ease: getEase(easing),
+                                ...animationData
+                            }, timing.delay);
+                        }
+                    }
+                }
+
+                // Get all elements with transition animations in both scenes (excluding magic elements)
+                const targetAnimationElms = Array.from(targetSceneElm.querySelectorAll('[data-transition-animation], [data-transition-animation-from], [data-transition-animation-to]'))
+                    .filter(el => !getTransitionIdentifier(el));
+                const sourceAnimationElms = Array.from(currentSceneElm.querySelectorAll('[data-transition-animation], [data-transition-animation-from], [data-transition-animation-to]'))
+                    .filter(el => !getTransitionIdentifier(el));
+
+                // Handle non-magic elements with transition animations in target scene
+                targetAnimationElms.forEach(element => handleNonMagicAnimation(element, true));
+
+                // Handle non-magic elements with transition animations in source scene  
+                sourceAnimationElms.forEach(element => handleNonMagicAnimation(element, false));
             }
         }
 
@@ -649,13 +704,92 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             }
         }
 
+        /**
+         * Applies an animation to an element(s) using GSAP
+         * @param {HTMLElement|string} element - Element or CSS selector within current scene
+         * @param {string|Object} animation - Animation name or properties
+         * @param {Object} [options] - Animation options
+         * @returns {gsap.core.Tween|null} The GSAP tween instance or null if invalid
+         */
+        hypeDocument.applyAnimation = function(element, animation, options = {}) {
+            // Kill any running animations on target element
+            gsap.killTweensOf(element);
+            
+            let animationData;
+            let target = element;
+
+            // If element is a string, treat it as a selector within current scene
+            if (typeof element === 'string') {
+                const currentScene = document.getElementById(this.currentSceneId());
+                target = currentScene.querySelectorAll(element);
+                if (target.length === 0) return null;
+            }
+
+            // Handle different animation input types
+            if (typeof animation === 'string') {
+                // Check if it's a registered animation name
+                if (!animation.includes(':')) {
+                    animationData = getRegisteredAnimation(animation);
+                }
+                // If not a registered animation, parse as simple animation string
+                if (!animationData) {
+                    animationData = parseSimpleAnimation(animation);
+                }
+            } else if (typeof animation === 'object') {
+                animationData = animation;
+            }
+
+            if (!animationData) return null;
+
+            // Map of GSAP properties to Hype properties
+            const hypePropertyMap = getDefault('hypePropertyMap');
+
+            // Create animation configuration
+            const finalAnimation = {
+                ease: getEase(options.ease),
+                duration: options.duration || getDefault('durationAnimation'),
+                ...animationData,
+                ...options,
+                onComplete: () => {
+                    // Skip syncing Hype properties if skip option is set
+                    if (!options.skipHypeSync) {
+                        // Handle both single elements and NodeLists
+                        const elements = target.length ? target : [target];
+                        elements.forEach(el => {
+                            Object.entries(animationData).forEach(([key, value]) => {
+                                // Map GSAP props to Hype props to sync runtime state
+                                const hypeProp = hypePropertyMap[key];
+                                if (hypeProp) {
+                                    if (Array.isArray(hypeProp)) {
+                                        hypeProp.forEach(prop => {
+                                            this.setElementProperty(el, prop, value);
+                                        });
+                                    } else {
+                                        this.setElementProperty(el, hypeProp, value);
+                                    }
+                                }
+                            });
+                        });
+                    }
+                    
+                    // Call user's onComplete if provided
+                    if (options.onComplete) options.onComplete();
+                }
+            };
+
+            // Use gsap.from if options.from or animationData.from is true, otherwise use gsap.to
+            return (options.from || animationData.from) ? 
+                gsap.from(target, finalAnimation) : 
+                gsap.to(target, finalAnimation);
+        }
+        
     }
 
     if ("HYPE_eventListeners" in window === false) window.HYPE_eventListeners = Array();
     window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 
     return {
-        version: '2.5.7',
+        version: '2.5.8',
         getDefault,
         setDefault,
         clearCachedMagicProperties,
