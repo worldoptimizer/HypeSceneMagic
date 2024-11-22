@@ -84,11 +84,11 @@ Customize transitions using the following data attributes:
 | `data-transition-duration`     | Duration of the transition. **Unitless values are factors relative to the total duration** (e.g., `1` equals 100%, but thats anyway the default). Accepts the same formats as `data-transition-delay`.                                         | 1, 0.75, 75%, 0.75          |
 | `data-transition-ease`         | Easing function for the transition. Overrides the default easing.                                                                                                                      | easein, power1.in, bounce    |
 | `data-transition-order`        | Z-index stacking order during the transition. Use `front` to bring an element forward, `back` to send it behind, or specify a z-index value.                                            | front, back, 10              |
-| `data-transition-fallback`     | Fallback animation for elements without a matching identifier in the other scene. Define GSAP animation properties.                                                                     | opacity:0; x:+=100           |
-| `data-transition-fallback-from`| Fallback animation applied to elements in the **target** scene when there's no match in the current scene.                                                                             | opacity:0; scale:0.5         |
-| `data-transition-fallback-to`  | Fallback animation applied to elements in the **current** scene when there's no match in the target scene.                                                                             | opacity:0; x:100             |
+| `data-transition-animation`     | Animation for elements during scene transitions. For magic-connected elements, only applies when no match is found. Define GSAP animation properties.                                    | opacity:0; x:+=100           |
+| `data-transition-animation-from`| Animation applied to elements in the **target** scene. For magic-connected elements, only applies when no match is found in the current scene.                                          | opacity:0; scale:0.5         |
+| `data-transition-animation-to`  | Animation applied to elements in the **current** scene. For magic-connected elements, only applies when no match is found in the target scene.                                          | opacity:0; x:100             |
 
-**Note**: The `data-transition-fallback` attributes allow you to define how unmatched elements transition, ensuring a smooth visual experience.
+**Note**: For elements without magic connections, the animation attributes define their transition behavior. For magic-connected elements, these animations serve as fallbacks when no matching element is found in the other scene.
 
 ### Special `target` Keyword
 
@@ -137,8 +137,70 @@ If transitioning from "My First Scene" to "Product Details":
 
 **Note**: All spaces are removed from scene names in the custom behavior names.
 
+---
+
+### Transition Animations
+
+Elements can participate in scene transitions through animation attributes set in the Identity Inspector. These animations define how elements enter and exit during scene transitions.
+
+| Attribute | Description |
+|-----------|-------------|
+| `data-transition-animation` | Animation applied during both entry and exit |
+| `data-transition-animation-from` | Animation applied when the element enters |
+| `data-transition-animation-to` | Animation applied when the element exits |
+
+#### Common Animation Patterns
+
+Here are common examples when used with `data-transition-animation-from`:
+
+```
+opacity:0                // Start transparent, fade in
+opacity:0; x:-100       // Start left, fade in while moving right
+opacity:0; x:100        // Start right, fade in while moving left
+opacity:0; scale:0.5    // Start small, fade in while scaling up
+opacity:0; y:-50        // Start above, fade in while moving down
+opacity:0; rotate:180   // Start rotated, fade in while spinning
+opacity:0; scale:150%   // Start large, fade in while scaling down
+x:-100; opacity:0       // Start left and transparent
+backgroundColor:#fff    // Start white, transition to element color
+```
+
+**Note**: When using the same values in `data-transition-animation-to`, the animation will be reversed. For example, `opacity: 0; x: -100` will fade out while moving left.
+
+#### Using Registered Animations
+
+For frequently used animations, you can register them once and reuse them by name:
+
+```javascript
+// Register common animations
+hypeDocument.registerAnimation('fadeIn', 'opacity:0');
+hypeDocument.registerAnimation('fadeLeft', 'opacity:0; x:-100');
+hypeDocument.registerAnimation('fadeRight', 'opacity:0; x:100');
+hypeDocument.registerAnimation('scaleUp', 'opacity:0; scale:0.5');
+hypeDocument.registerAnimation('slideDown', 'opacity:0; y:100');
+```
+
+Then use the registered name in your attribute value:
+```
+fadeLeft     // Use instead of 'opacity:0; x:-100'
+scaleUp      // Use instead of 'opacity:0; scale:0.5'
+slideDown    // Use instead of 'opacity:0; y:100'
+```
+
+### Transition Animations as Fallbacks
+
+For elements with magic connections (matching identifiers across scenes), transition animations serve a different purpose. They act as fallbacks when:
+1. The element doesn't find a matching element in the target scene
+2. The element in the target scene doesn't find a match in the current scene
+
+In these cases, the transition animations provide a graceful way to animate unmatched elements:
+- Elements without matches in the target scene will use `data-transition-animation-to` or `data-transition-animation`
+- Elements without matches in the current scene will use `data-transition-animation-from` or `data-transition-animation`
+
+**Note**: If an element has a magic connection (finds its match in the other scene), these transition animations are ignored in favor of the magic transition between the matched elements.
 
 ---
+
 
 ## Transition Customization
 
@@ -179,64 +241,6 @@ hypeDocument.showSceneNamedMagic('Scene2', 1.0, 'power1.inOut', {
 	}
 });
 ```
-### Fallback Animations
-
-Fallback animations define how elements without a matching identifier should behave during transitions. These are set using the following attributes in the Identity Inspector:
-
-| Attribute | Description |
-|-----------|-------------|
-| `data-transition-fallback` | Applied to both entering and exiting unmatched elements |
-| `data-transition-fallback-from` | Applied to elements in the **target** scene without a match |
-| `data-transition-fallback-to` | Applied to elements in the **current** scene without a match |
-
-#### Direct Property Definition
-
-You can define animation properties directly in the attribute value. Here are common examples when used with `data-transition-fallback-from`:
-
-```
-
-opacity:0                // Start transparent, fade in
-opacity:0; x:-100       // Start left, fade in while moving right
-opacity:0; x:100        // Start right, fade in while moving left
-opacity:0; scale:0.5    // Start small, fade in while scaling up
-opacity:0; y:-50        // Start above, fade in while moving down
-opacity:0; rotate:180   // Start rotated, fade in while spinning
-opacity:0; scale:150%   // Start large, fade in while scaling down
-x:-100; opacity:0       // Start left and transparent
-backgroundColor:#fff    // Start white, transition to element color
-```
-
-**Note**: When using the same values in `data-transition-fallback-to`, the animation will be reversed. For example, `opacity: 0; x: -100` will fade out while moving left.
-
-#### Using Registered Animations
-
-For frequently used animations, you can register them once and reuse them by name using `hypeDocument.registerAnimation`:
-
-```javascript
-// Register common animations through the hypeDocument API
-hypeDocument.registerAnimation('fadeIn', 'opacity:0');
-hypeDocument.registerAnimation('fadeLeft', 'opacity:0; x:-100');
-hypeDocument.registerAnimation('fadeRight', 'opacity:0; x:100');
-hypeDocument.registerAnimation('scaleUp', 'opacity:0; scale:0.5');
-hypeDocument.registerAnimation('slideDown', 'opacity:0; y:100');
-```
-
-You can also register animations using `HypeSceneMagic.registerAnimation`:
-
-```javascript
-// Register common animations through the HypeSceneMagic singleton
-HypeSceneMagic.registerAnimation('fadeIn', 'opacity:0');
-```
-
-
-Then simply **use** the registered name in your attribute value:
-```
-fadeLeft     // Use instead of 'opacity:0; x:-100'
-scaleUp      // Use instead of 'opacity:0; scale:0.5'
-slideDown    // Use instead of 'opacity:0; y:100'
-```
-
-
 
 ---
 
@@ -271,6 +275,7 @@ For a complete list of easing functions, refer to the [GSAP Easing Documentation
 ---
 
 ## Advanced Usage
+
 
 ### Clearing Cached Properties
 
@@ -314,6 +319,38 @@ let defaults = HypeSceneMagic.getDefault();
 // Get a specific default value
 let duration = HypeSceneMagic.getDefault('duration');
 ```
+
+### Direct Animation Application
+
+Use `applyAnimation` to trigger GSAP animations on any element:
+
+```javascript
+// Apply animation to an element
+hypeDocument.applyAnimation(element, "scale:2;rotation:45");
+
+// Apply animation with options
+hypeDocument.applyAnimation(element, "scale:2", {
+	duration: 0.3,
+	ease: "bounce.out",
+	from: true,  // Use gsap.from instead of gsap.to
+	onComplete: function() {
+		console.log("Animation complete!");
+	}
+});
+
+// Apply a registered animation
+hypeDocument.applyAnimation(element, "bounceIn");
+```
+
+#### Options
+
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `duration` | Number | Animation duration in seconds | 0.25 |
+| `ease` | String | GSAP easing function | 'power1.inOut' |
+| `from` | Boolean | If true, uses gsap.from instead of gsap.to | false |
+| `skipHypeSync` | Boolean | Skip syncing final values to Hype properties | false |
+| `onComplete` | Function | Callback when animation completes | null |
 
 ---
 
