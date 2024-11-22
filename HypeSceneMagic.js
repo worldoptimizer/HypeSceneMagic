@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.5.5 (GSAP Version)
+ * Hype SceneMagic 2.5.7 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -15,6 +15,9 @@
  *       Refactored to use a native Hype crossfade transition, but overridden with the magicTransition class
  *       Added z-index management for proper scene layering during transitions
  * 2.5.5 Added support for runtime transition mapping and made identifiers case-insensitive
+ * 2.5.6 Refactored beforeStart/afterEnd to onTransitionStart/onTransitionEnd
+ *       Added animation registration system for reusable animations
+ * 2.5.7 Added onTransitionProgress callback to track overall transition progress
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {
@@ -43,7 +46,8 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
             textDecoration: 'none',
         },
         crossFadeFactor: 0.5,
-        duration: 0.5
+        duration: 0.5,
+        registeredAnimations: {}
     };
 
     // Add WeakMap for storing initial properties
@@ -272,6 +276,27 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
     }
 
     /**
+     * Registers an animation for reuse
+     * @param {string} name - Name of the animation
+     * @param {Object|string} animation - Animation properties object or string
+     */
+    function registerAnimation(name, animation) {
+        if (typeof animation === 'string') {
+            animation = parseSimpleAnimation(animation);
+        }
+        _default.registeredAnimations[name.toLowerCase()] = animation;
+    }
+
+    /**
+     * Gets a registered animation by name
+     * @param {string} name - Name of the animation
+     * @returns {Object|null} Animation object if found, null otherwise
+     */
+    function getRegisteredAnimation(name) {
+        return _default.registeredAnimations[name.toLowerCase()] || null;
+    }
+
+    /**
      * Main document load handler for Hype Scene Magic functionality
      * @param {Object} hypeDocument - The Hype document instance
      * @param {HTMLElement} element - The document element
@@ -281,6 +306,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
         const hypeDocElm = element;
         addMagicTransitionCSS();
 
+        // Add registerAnimation to hypeDocument
+        hypeDocument.registerAnimation = registerAnimation;
+
         /**
          * Shows a scene with magic transition effects
          * @param {string} targetSceneName - Name of the scene to transition to
@@ -288,8 +316,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
          * @param {string} [ease] - Easing function to use
          * @param {Object} [options] - Additional options for the transition
          * @param {number} [options.crossFadeFactor] - Custom cross fade factor (0-1)
-         * @param {Function} [options.beforeStart] - Called before transition starts
-         * @param {Function} [options.afterEnd] - Called after transition completes
+         * @param {Function} [options.onTransitionStart] - Called before transition starts
+         * @param {Function} [options.onTransitionProgress] - Called during transition with progress (0-1)
+         * @param {Function} [options.onTransitionEnd] - Called after transition completes
          */
         hypeDocument.showSceneNamedMagic = function(targetSceneName, duration, ease, options = {}) {
             // Return if we are currently running a transition
@@ -340,9 +369,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                 currentSceneElm.classList.add('currentScene');
                 targetSceneElm.classList.add('targetScene');
 
-                // Call beforeStart hook if provided
-                if (options.beforeStart) {
-                    options.beforeStart(currentSceneElm, targetSceneElm, { duration, ease });
+                // Call onTransitionStart hook if provided
+                if (options.onTransitionStart) {
+                    options.onTransitionStart(currentSceneElm, targetSceneElm, { duration, ease });
                 }
 
                 // Use swap transition but prohibit default behavior with magicTransition class
@@ -350,6 +379,11 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                 
                 // Create a timeline to manage all animations
                 const masterTimeline = gsap.timeline({
+                    onUpdate: function() {
+                        if (options.onTransitionProgress) {
+                            options.onTransitionProgress(this.progress(), currentSceneElm, targetSceneElm);
+                        }
+                    },
                     onComplete: () => {
                         // Reset properties for all elements that need restoration
                         elementsToRestore.forEach(element => {
@@ -362,8 +396,8 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                         currentSceneElm.classList.remove('currentScene', 'fadeComplete');
                         targetSceneElm.classList.remove('targetScene', 'fadeComplete');
                         
-                        if (options.afterEnd) {
-                            options.afterEnd(currentSceneElm, targetSceneElm, { duration, ease });
+                        if (options.onTransitionEnd) {
+                            options.onTransitionEnd(currentSceneElm, targetSceneElm, { duration, ease });
                         }
                     }
                 });
@@ -478,7 +512,18 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
                             // If fallback animation data is found, parse and animate
                             if (fallbackAnimation) {
-                                const animationData = parseSimpleAnimation(fallbackAnimation);
+                                let animationData;
+                                
+                                // Check if fallbackAnimation is a registered animation name
+                                if (!fallbackAnimation.includes(':')) {
+                                    animationData = getRegisteredAnimation(fallbackAnimation);
+                                }
+                                
+                                // If not a registered animation, parse as simple animation string
+                                if (!animationData) {
+                                    animationData = parseSimpleAnimation(fallbackAnimation);
+                                }
+
                                 if (animationData) {
                                     // Get initial properties to make sure they are cached
                                     getCachedMagicProperties(targetElement);
@@ -521,7 +566,17 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                             
                             // If fallback-to animation data is found, parse and animate
                             if (fallbackToAnimation) {
-                                const animationData = parseSimpleAnimation(fallbackToAnimation);
+                                let animationData;
+                                
+                                // Check if fallbackToAnimation is a registered animation name
+                                if (!fallbackToAnimation.includes(':')) {
+                                    animationData = getRegisteredAnimation(fallbackToAnimation);
+                                }
+                                
+                                // If not a registered animation, parse as simple animation string
+                                if (!animationData) {
+                                    animationData = parseSimpleAnimation(fallbackToAnimation);
+                                }
                                 
                                 if (animationData) {
                                     // Get initial properties to make sure they are cached
@@ -553,8 +608,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
          * @param {number} [duration] - Duration of the transition in seconds
          * @param {string} [ease] - Easing function to use
          * @param {Object} [options] - Additional options for the transition
-         * @param {Function} [options.beforeStart] - Called before transition starts
-         * @param {Function} [options.afterEnd] - Called after transition completes
+         * @param {Function} [options.onTransitionStart] - Called before transition starts
+         * @param {Function} [options.onTransitionProgress] - Called during transition with progress
+         * @param {Function} [options.onTransitionEnd] - Called after transition completes
          */
         hypeDocument.showNextSceneMagic = function(duration, ease, options) {
             const scenes = this.sceneNames();
@@ -570,8 +626,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
          * @param {number} [duration] - Duration of the transition in seconds
          * @param {string} [ease] - Easing function to use
          * @param {Object} [options] - Additional options for the transition
-         * @param {Function} [options.beforeStart] - Called before transition starts
-         * @param {Function} [options.afterEnd] - Called after transition completes
+         * @param {Function} [options.onTransitionStart] - Called before transition starts
+         * @param {Function} [options.onTransitionProgress] - Called during transition with progress
+         * @param {Function} [options.onTransitionEnd] - Called after transition completes
          */
         hypeDocument.showPreviousSceneMagic = function(duration, ease, options) {
             const scenes = this.sceneNames();
@@ -588,10 +645,11 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
     window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 
     return {
-        version: '2.5.5',
+        version: '2.5.7',
         getDefault,
         setDefault,
         clearCachedMagicProperties,
-        extractMagicIdentifier
+        extractMagicIdentifier,
+        registerAnimation
     };
 })();
