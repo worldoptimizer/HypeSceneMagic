@@ -18,6 +18,8 @@
  * 2.5.6 Refactored beforeStart/afterEnd to onTransitionStart/onTransitionEnd
  *       Added animation registration system for reusable animations
  * 2.5.7 Added onTransitionProgress callback to track overall transition progress
+ *       Added custom behaviors: magicTransitionStart/End, magicTransition_{fromScene}_to_{toScene},
+ *       magicTransitionFrom_{fromScene}, magicTransitionTo_{toScene} (scene names without spaces)
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {
@@ -374,6 +376,14 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                     options.onTransitionStart(currentSceneElm, targetSceneElm, { duration, ease });
                 }
 
+                // Trigger magic transition start event
+                hypeDocument.triggerCustomBehaviorNamed('magicTransitionStart');
+                
+                // Trigger scene-specific transition behaviors (with spaces removed, sorted by specificity)
+                hypeDocument.triggerCustomBehaviorNamed(`magicTransitionFrom_${currentSceneName.replace(/\s+/g, '')}`);
+                hypeDocument.triggerCustomBehaviorNamed(`magicTransitionTo_${targetSceneName.replace(/\s+/g, '')}`);
+                hypeDocument.triggerCustomBehaviorNamed(`magicTransition_${currentSceneName.replace(/\s+/g, '')}_to_${targetSceneName.replace(/\s+/g, '')}`);
+                
                 // Use swap transition but prohibit default behavior with magicTransition class
                 hypeDocument.showSceneNamed(targetSceneName, hypeDocument.kSceneTransitionCrossfade, duration);
                 
@@ -399,6 +409,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                         if (options.onTransitionEnd) {
                             options.onTransitionEnd(currentSceneElm, targetSceneElm, { duration, ease });
                         }
+
+                        // Trigger magic transition end event
+                        hypeDocument.triggerCustomBehaviorNamed('magicTransitionEnd');
                     }
                 });
 
@@ -420,9 +433,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                 masterTimeline.call(() => {
                     gsap.killTweensOf(currentSceneElm.querySelectorAll('*'));
                 }, null, crossFadeDuration);
-                
-                // todo: check if this is needed anymore by checking if it still has an effect
-                this.triggerCustomBehaviorNamed('magicTransition');
 
                 // Get all magic elements in target and source scenes
                 const targetMagicElms = targetSceneElm.querySelectorAll('div[class*="magic"], div[data-transition-id]');
