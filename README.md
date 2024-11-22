@@ -129,59 +129,85 @@ hypeDocument.showSceneNamedMagic('Scene2', 1.0, 'power1.inOut', {
 
 SceneMagic provides hooks to execute custom code at specific points during the transition:
 
-- **`beforeStart`**: Called before the transition begins.
-- **`afterEnd`**: Called after the transition completes.
+| Hook | Description |
+|------|-------------|
+| `onTransitionStart` | Called before the transition begins |
+| `onTransitionProgress` | Called continuously during the transition with progress (0-1) |
+| `onTransitionEnd` | Called after the transition completes |
 
 **Usage**:
 
 ```javascript
 hypeDocument.showSceneNamedMagic('Scene2', 1.0, 'power1.inOut', {
-    beforeStart: function(currentScene, targetScene, context) {
-        console.log('Transition is about to start.');
-    },
-    afterEnd: function(currentScene, targetScene, context) {
-        console.log('Transition has completed.');
-    }
+	onTransitionStart: function(currentScene, targetScene, context) {
+		console.log('Transition is about to start.');
+	},
+	onTransitionProgress: function(progress, currentScene, targetScene) {
+		console.log('Transition progress:', progress);
+	},
+	onTransitionEnd: function(currentScene, targetScene, context) {
+		console.log('Transition has completed.');
+	}
 });
 ```
-
 ### Fallback Animations
 
-Fallback animations define how elements without a matching identifier should behave during transitions. This ensures that all elements transition smoothly, even if they don't have a counterpart in the other scene.
+Fallback animations define how elements without a matching identifier should behave during transitions. These are set using the following attributes in the Identity Inspector:
 
-When you assign fallback animations to an element, you're specifying how it should appear or disappear if it doesn't have a matching element in the target or current scene.
+| Attribute | Description |
+|-----------|-------------|
+| `data-transition-fallback` | Applied to both entering and exiting unmatched elements |
+| `data-transition-fallback-from` | Applied to elements in the **target** scene without a match |
+| `data-transition-fallback-to` | Applied to elements in the **current** scene without a match |
 
-- **`data-transition-fallback`**: Applied to both entering and exiting unmatched elements.
-- **`data-transition-fallback-from`**: Specific to elements in the **target** scene without a match in the current scene.
-- **`data-transition-fallback-to`**: Specific to elements in the **current** scene without a match in the target scene.
+#### Direct Property Definition
 
-**Defining Fallback Animations**:
+You can define animation properties directly in the attribute value. Here are common examples when used with `data-transition-fallback-from`:
 
-In the **Identity Inspector**, add the appropriate attribute and define the animation properties using GSAP syntax:
+```
 
-- `opacity`: Controls the transparency.
-- `x`, `y`: Controls the position.
-- `scale`: Controls the size.
+opacity:0                // Start transparent, fade in
+opacity:0; x:-100       // Start left, fade in while moving right
+opacity:0; x:100        // Start right, fade in while moving left
+opacity:0; scale:0.5    // Start small, fade in while scaling up
+opacity:0; y:-50        // Start above, fade in while moving down
+opacity:0; rotate:180   // Start rotated, fade in while spinning
+opacity:0; scale:150%   // Start large, fade in while scaling down
+x:-100; opacity:0       // Start left and transparent
+backgroundColor:#fff    // Start white, transition to element color
+```
 
-**Examples**:
+**Note**: When using the same values in `data-transition-fallback-to`, the animation will be reversed. For example, `opacity: 0; x: -100` will fade out while moving left.
 
-- **For an element appearing in the target scene (no match in current scene):**
+#### Using Registered Animations
 
-  To make an unmatched element fade in and move from the left in the target scene:
+For frequently used animations, you can register them once and reuse them by name using `hypeDocument.registerAnimation`:
 
-  1. Select the element in the **Identity Inspector**.
-  2. Add the attribute `data-transition-fallback-from` with the value `opacity:0; x:-100`.
+```javascript
+// Register common animations through the hypeDocument API
+hypeDocument.registerAnimation('fadeIn', 'opacity:0');
+hypeDocument.registerAnimation('fadeLeft', 'opacity:0; x:-100');
+hypeDocument.registerAnimation('fadeRight', 'opacity:0; x:100');
+hypeDocument.registerAnimation('scaleUp', 'opacity:0; scale:0.5');
+hypeDocument.registerAnimation('slideDown', 'opacity:0; y:100');
+```
 
-  This ensures that the element fades in and moves from 100 pixels to the left when it appears without a counterpart in the current scene.
+You can also register animations using `HypeSceneMagic.registerAnimation`:
 
-- **For an element disappearing from the current scene (no match in target scene):**
+```javascript
+// Register common animations through the HypeSceneMagic singleton
+HypeSceneMagic.registerAnimation('fadeIn', 'opacity:0');
+```
 
-  To make an unmatched element fade out and move to the right in the current scene:
 
-  1. Select the element in the **Identity Inspector**.
-  2. Add the attribute `data-transition-fallback-to` with the value `opacity:0; x:+100`.
+Then simply **use** the registered name in your attribute value:
+```
+fadeLeft     // Use instead of 'opacity:0; x:-100'
+scaleUp      // Use instead of 'opacity:0; scale:0.5'
+slideDown    // Use instead of 'opacity:0; y:100'
+```
 
-  This configuration ensures that when there's no matching element in the target scene, the element will fade out and move 100 pixels to the right during the transition.
+
 
 ---
 
