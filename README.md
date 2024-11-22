@@ -111,6 +111,35 @@ This means the element will use the `data-transition-delay` and `data-transition
 
 ---
 
+### Built-in Custom Behaviors Callbacks for Persistent Symbols
+
+SceneMagic automatically triggers several custom behaviors during transitions that you can use in Tumult Hype's Actions panel:
+
+| Custom Behavior | Description |
+|----------------|-------------|
+| `magicTransitionStart` | Triggered when any magic transition begins |
+| `magicTransitionEnd` | Triggered when any magic transition completes |
+| `magicTransition_{fromScene}_to_{toScene}` | Triggered for specific scene combinations |
+| `magicTransitionFrom_{fromScene}` | Triggered when transitioning from a specific scene |
+| `magicTransitionTo_{toScene}` | Triggered when transitioning to a specific scene |
+
+**Examples**:
+
+If transitioning from "Scene A" to "Scene B":
+- `magicTransition_SceneA_to_SceneB`
+- `magicTransitionFrom_SceneA`
+- `magicTransitionTo_SceneB`
+
+If transitioning from "My First Scene" to "Product Details":
+- `magicTransition_MyFirstScene_to_ProductDetails`
+- `magicTransitionFrom_MyFirstScene`
+- `magicTransitionTo_ProductDetails`
+
+**Note**: All spaces are removed from scene names in the custom behavior names.
+
+
+---
+
 ## Transition Customization
 
 ### Cross-Fade Factor
