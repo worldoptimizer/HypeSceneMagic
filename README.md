@@ -111,6 +111,34 @@ This means the element will use the `data-transition-delay` and `data-transition
 
 ---
 
+
+### Multiple Magic Identifiers & Match Resolution
+
+SceneMagic 2.6.0 introduces support for multiple magic identifiers per element through both class names and data attributes. Elements can now be tagged with multiple identifiers that are matched case-insensitively across scenes:
+
+```javascript
+// Scene 1
+<div class="magicHeader magicLogo">...</div>
+
+// Scene 2  
+<div data-transition-id="header,logo">...</div>
+```
+
+When multiple potential matches exist between scenes, SceneMagic employs a "last match wins" strategy - the last valid match takes precedence and any existing animations on the elements are killed via `gsap.killTweensOf()`. This ensures clean transitions without animation conflicts.
+
+Match resolution follows this process:
+1. Collect all identifiers from both class names (`magic*`) and `data-transition-id` attributes
+2. Convert identifiers to lowercase and remove `magic` prefix
+3. Compare identifier sets between elements to find matches
+4. For multiple matches, use the last valid match and kill any existing tweens
+5. Apply the transition animation between the matched elements
+
+This provides maximum flexibility for complex layouts while maintaining predictable animation behavior through automatic cleanup of conflicting transitions.
+This capability is particularly powerful for efficient carousel implementations. Instead of creating individual off-screen elements for each possible card position, you can use a single element tagged with multiple positions (e.g., `magicCard1 magicCard2`) to represent multiple starting states. When transitioning between scenes, SceneMagic automatically matches with the optimal position, allowing fluid animations from any card to any other card while maintaining a minimal DOM footprint.
+
+
+---
+
 ### Built-in Custom Behaviors Callbacks for Persistent Symbols
 
 SceneMagic automatically triggers several custom behaviors during transitions that you can use in Tumult Hype's Actions panel:
