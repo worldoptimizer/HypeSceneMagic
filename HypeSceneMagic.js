@@ -1,6 +1,5 @@
-
 /*!
- * Hype SceneMagic 2.5.9 (GSAP Version)
+ * Hype SceneMagic 2.6.0 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -29,10 +28,12 @@
  * 2.5.9 Fixed issue where transitions without magic elements would complete too early
  *       Added minimum duration enforcement using GSAP timeline
  *       Fixed an issue when matching layouts by dimensions interfered with matching by name
+ * 2.6.0 Added support for multiple magic identifiers per element
+ *       Removed match tracking in favor of "last match wins" approach (using killTweensOf)
+ *       Added onTransitionPrepare callback and moved onTransitionStart to timeline start
  */
 
-if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {
-	let _default = {
+if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	let _default = {
 		easingMap: {
 			'easein': 'power1.in',
 			'easeout': 'power1.out',
@@ -183,6 +184,34 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 	}
 
 	/**
+	 * Gets all transition identifiers from an element
+	 * @param {HTMLElement} element - The DOM element
+	 * @returns {string[]} Array of cleaned identifiers
+	 */
+	function getTransitionIdentifiers(element) {
+		const identifiers = [];
+		
+		// Get identifiers from magic classes
+		element.classList.forEach(className => {
+			if (className.toLowerCase().startsWith('magic') && className.length > 5) {
+				identifiers.push(className.slice(5).toLowerCase());
+			}
+		});
+		
+		// Get identifiers from data attribute
+		const dataIds = element.getAttribute('data-transition-id');
+		if (dataIds) {
+			identifiers.push(...dataIds.split(',')
+				.map(id => id.trim().toLowerCase())
+				.map(id => id.startsWith('magic') ? id.slice(5) : id)
+				.filter(Boolean)
+			);
+		}
+		
+		return [...new Set(identifiers)]; // Remove duplicates
+	}
+
+	/**
 	 * Calculates timing values for transitions based on percentages/factors and total duration
 	 * @param {string|number} delayValue - Delay as percentage (with %), factor, or time value (s/ms)
 	 * @param {string|number} durationValue - Duration as percentage (with %), factor, or time value (s/ms)
@@ -233,43 +262,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			].join('');
 			document.head.appendChild(style);
 		}
-	}
-
-	/**
-	 * Extracts the magic identifier from an element's class list
-	 * @param {HTMLElement} element - The element to check
-	 * @returns {string|null} The identifier portion of the magic class, or null if not found
-	 */
-	function extractMagicIdentifier(element) {
-		for (let className of element.classList) {
-			if (className.toLowerCase().startsWith('magic') && className.length > 5) {
-				return className.slice(5).toLowerCase();
-			}
-		}
-		return null;
-	}
-
-	/**
-	 * Gets the transition identifier from an element
-	 * @param {HTMLElement} element - The DOM element to get the transition identifier from
-	 * @returns {string|null} The transition identifier if found, null otherwise
-	 */
-	function getTransitionIdentifier(element) {
-		// Try to get identifier from class first
-		let identifier = extractMagicIdentifier(element);
-		
-		// If no class identifier found, check data attribute
-		if (!identifier) {
-			identifier = element.getAttribute('data-transition-id');
-		}
-		
-		// Remove 'magic' prefix if present and convert to lowercase
-		if (identifier && identifier.toLowerCase().startsWith('magic')) {
-			identifier = identifier.slice(5);
-		}
-		
-		// Return lowercase identifier or null if none found
-		return identifier ? identifier.toLowerCase() : null;
 	}
 
 	/**
@@ -398,9 +390,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			currentSceneElm.classList.add('currentScene');
 			targetSceneElm.classList.add('targetScene');
 
-			// Call onTransitionStart hook if provided
-			if (options.onTransitionStart) {
-				options.onTransitionStart(currentSceneElm, targetSceneElm, { duration, ease });
+			// Call onTransitionPrepare hook if provided (before any setup)
+			if (options.onTransitionPrepare) {
+				options.onTransitionPrepare(currentSceneElm, targetSceneElm, { duration, ease });
 			}
 
 			// Trigger magic transition start event
@@ -416,6 +408,12 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			
 			// Create a timeline to manage all animations
 			const masterTimeline = gsap.timeline({
+				onStart: () => {
+					// Call onTransitionStart hook when timeline actually starts
+					if (options.onTransitionStart) {
+						options.onTransitionStart(currentSceneElm, targetSceneElm, { duration, ease });
+					}
+				},
 				onUpdate: function() {
 					if (options.onTransitionProgress) {
 						options.onTransitionProgress(this.progress(), currentSceneElm, targetSceneElm);
@@ -484,18 +482,21 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
 			// Handle elements in target scene that are also in source scene
 			targetMagicElms.forEach(targetElement => {
-				const targetId = getTransitionIdentifier(targetElement);
+				const targetIds = getTransitionIdentifiers(targetElement);
 				
-				// If element has a transition identifier, it's a magic element
-				if (targetId) {
+				// If element has transition identifiers
+				if (targetIds.length > 0) {
 					// Find matching element in source scene
 					const sourceElement = Array.from(sourceMagicElms).find(el => {
-						const sourceId = getTransitionIdentifier(el);
-						return sourceId && sourceId.toLowerCase() === targetId.toLowerCase();
+						const sourceIds = getTransitionIdentifiers(el);
+						return sourceIds.some(sourceId => targetIds.includes(sourceId));
 					});
 
 					// If matching element is found, animate transition
 					if (sourceElement) {
+						// Kill any existing animations
+						gsap.killTweensOf([targetElement, sourceElement]);
+						
 						// Add source element to restore list
 						elementsToRestore.add(sourceElement);
 						
@@ -563,6 +564,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
 						// If animation data is found, parse and animate
 						if (animation) {
+							// Kill any existing animations
+							gsap.killTweensOf(targetElement);
+							
 							let animationData;
 							
 							// Check if animation is a registered animation name
@@ -600,17 +604,20 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
 			// Handle elements in source scene that aren't in target scene
 			sourceMagicElms.forEach(sourceElement => {
-				const sourceId = getTransitionIdentifier(sourceElement);
-				if (sourceId) {
+				const sourceIds = getTransitionIdentifiers(sourceElement);
+				if (sourceIds.length > 0) {
 					// Find matching element in target scene
-					const targetElement = Array.from(targetMagicElms).find(el => {
-						const targetId = getTransitionIdentifier(el);
-						return targetId && targetId.toLowerCase() === sourceId.toLowerCase();
+					const hasMatch = Array.from(targetMagicElms).some(el => {
+						const targetIds = getTransitionIdentifiers(el);
+						return targetIds.some(targetId => sourceIds.includes(targetId));
 					});
 
-					// If matching element is found, animate transition
-					if (!targetElement) {
+					// If no matching element is found
+					if (!hasMatch) {
 						elementsToRestore.add(sourceElement);
+						
+						// Kill any existing animations
+						gsap.killTweensOf(sourceElement);
 						
 						// Check for data-transition-animation-to and data-transition-animation animation data
 						const animation = sourceElement.getAttribute('data-transition-animation-to') || sourceElement.getAttribute('data-transition-animation');
@@ -659,6 +666,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 								element.getAttribute('data-transition-animation');
 				
 				if (animation) {
+					// Kill any existing animations
+					gsap.killTweensOf(element);
+					
 					let animationData = animation.includes(':') ? 
 						parseSimpleAnimation(animation) : 
 						getRegisteredAnimation(animation);
@@ -680,9 +690,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
 			// Get all elements with transition animations in both scenes (excluding magic elements)
 			const targetAnimationElms = Array.from(targetSceneElm.querySelectorAll('[data-transition-animation], [data-transition-animation-from], [data-transition-animation-to]'))
-				.filter(el => !getTransitionIdentifier(el));
+				.filter(el => getTransitionIdentifiers(el).length === 0);
 			const sourceAnimationElms = Array.from(currentSceneElm.querySelectorAll('[data-transition-animation], [data-transition-animation-from], [data-transition-animation-to]'))
-				.filter(el => !getTransitionIdentifier(el));
+				.filter(el => getTransitionIdentifiers(el).length === 0);
 
 			// Handle non-magic elements with transition animations in target scene
 			targetAnimationElms.forEach(element => handleNonMagicAnimation(element, true));
@@ -812,11 +822,11 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 	window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 
 	return {
-		version: '2.5.9',
+		version: '2.6.0',
 		getDefault,
 		setDefault,
 		clearCachedMagicProperties,
-		extractMagicIdentifier,
+        getTransitionIdentifiers,
 		registerAnimation
 	};
 })();
