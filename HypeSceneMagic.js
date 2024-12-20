@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.6.0 (GSAP Version)
+ * Hype SceneMagic 2.6.1 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -31,6 +31,7 @@
  * 2.6.0 Added support for multiple magic identifiers per element
  *       Removed match tracking in favor of "last match wins" approach (using killTweensOf)
  *       Added onTransitionPrepare callback and moved onTransitionStart to timeline start
+ * 2.6.1 Fixed issue where non-magic elements with data-transition-animation weren't being properly restored
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	let _default = {
@@ -428,6 +429,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 							requestAnimationFrame(() => {
 								elementsToRestore.forEach(element => {
 									const initialProps = getCachedMagicProperties(element);
+									console.log(element.id, initialProps);
 									gsap.set(element, initialProps);
 								});
 							});
@@ -666,12 +668,18 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 								element.getAttribute('data-transition-animation');
 				
 				if (animation) {
+					// Add element to restore list
+					elementsToRestore.add(element);
+					
+					// Get and cache initial properties
+					getCachedMagicProperties(element);
+
 					// Kill any existing animations
 					gsap.killTweensOf(element);
 					
 					let animationData = animation.includes(':') ? 
-						parseSimpleAnimation(animation) : 
-						getRegisteredAnimation(animation);
+							parseSimpleAnimation(animation) : 
+							getRegisteredAnimation(animation);
 
 					if (animationData) {
 						const delayPercentage = element.getAttribute('data-transition-delay') || 0;
@@ -822,7 +830,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 	window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 
 	return {
-		version: '2.6.0',
+		version: '2.6.1',
 		getDefault,
 		setDefault,
 		clearCachedMagicProperties,
