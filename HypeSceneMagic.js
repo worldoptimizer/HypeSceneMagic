@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.6.1 (GSAP Version)
+ * Hype SceneMagic 2.6.2 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -32,9 +32,13 @@
  *       Removed match tracking in favor of "last match wins" approach (using killTweensOf)
  *       Added onTransitionPrepare callback and moved onTransitionStart to timeline start
  * 2.6.1 Fixed issue where non-magic elements with data-transition-animation weren't being properly restored
+ * 2.6.2 Added skipProperties to default configuration to skip properties from being tweened like fontFamily
+ *       Fixed issue when delays and durations exceeded into next magic transition by ending previous master timeline
  */
 
-if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	let _default = {
+if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
+	const _version = '2.6.2';
+	let _default = {
 		easingMap: {
 			'easein': 'power1.in',
 			'easeout': 'power1.out',
@@ -73,11 +77,15 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			width: 'width',
 			height: 'height',
 			zIndex: 'z-index'
-		}
+		},
+		skipProperties: ['fontFamily'],
 	};
 
 	// Add WeakMap for storing initial properties
 	const _initialPropertiesCache = new WeakMap();
+
+	// store document related state
+	const _documentStates = new WeakMap(); 
 
 	/**
 	 * Gets computed style properties for an element with caching
@@ -95,6 +103,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 		let properties = {};
 		let defaultProperties = getDefault('defaultProperties');
 		for (let key in defaultProperties) {
+			if (getDefault('skipProperties').includes(key)) continue;
 			properties[key] = element.style[key] || defaultProperties[key];
 		}
 
@@ -338,9 +347,19 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 		 * @param {Function} [options.onTransitionEnd] - Called after transition completes
 		 */
 		hypeDocument.showSceneNamedMagic = function(targetSceneName, duration, ease, options = {}) {
-			// Return if we are currently running a transition
-			if (hypeDocElm.classList.contains('magicTransition')) return;
-
+			// If we are currently running a transition, end it
+			if (hypeDocElm.classList.contains('magicTransition')) {
+				const documentState = _documentStates.get(hypeDocument);
+				if (documentState && documentState.masterTimeline) {
+					// end the timeline by forwarding to the end
+					documentState.masterTimeline.progress(1);
+					// remove the master timeline reference
+					delete documentState.masterTimeline;
+					// inform the user that the transition was ended and why
+					console.warn('HypeSceneMagic: Previous magic transition was interrupted by a new one. This indicates overlapping magic transitions in your Hype document.');
+				}
+			}
+			
 			// Get current scene and layout names
 			const currentSceneName = this.currentSceneName();
 			const currentLayoutName = this.currentLayoutName();
@@ -424,12 +443,11 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 					// Wait for target scene opacity to be 1 before cleanup
 					const checkOpacity = () => {
 						const opacity = getComputedStyle(targetSceneElm).opacity;
-						if (opacity === '1') {
+						if (parseFloat(opacity) == 1) {
 							// Reset properties for all elements that need restoration after a frame delay
 							requestAnimationFrame(() => {
 								elementsToRestore.forEach(element => {
 									const initialProps = getCachedMagicProperties(element);
-									console.log(element.id, initialProps);
 									gsap.set(element, initialProps);
 								});
 							});
@@ -445,6 +463,12 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
 							// Trigger magic transition end event
 							hypeDocument.triggerCustomBehaviorNamed('magicTransitionEnd');
+
+							// Remove the master timeline reference
+							const documentState = _documentStates.get(hypeDocument);
+							if (documentState) {
+								delete documentState.masterTimeline;
+							}
 						} else {
 							requestAnimationFrame(checkOpacity);
 						}
@@ -707,6 +731,12 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
 			// Handle non-magic elements with transition animations in source scene  
 			sourceAnimationElms.forEach(element => handleNonMagicAnimation(element, false));
+
+			// Store a reference to the master timeline in hypeDocument
+			if (!_documentStates.has(hypeDocument)) {
+				_documentStates.set(hypeDocument, {});
+			}
+			_documentStates.get(hypeDocument).masterTimeline = masterTimeline;
 		}
 
 		/**
@@ -830,7 +860,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 	window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 
 	return {
-		version: '2.6.1',
+		version: _version,
 		getDefault,
 		setDefault,
 		clearCachedMagicProperties,
