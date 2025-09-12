@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.6.2 (GSAP Version)
+ * Hype SceneMagic 2.6.3 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -34,10 +34,11 @@
  * 2.6.1 Fixed issue where non-magic elements with data-transition-animation weren't being properly restored
  * 2.6.2 Added skipProperties to default configuration to skip properties from being tweened like fontFamily
  *       Fixed issue when delays and durations exceeded into next magic transition by ending previous master timeline
+ * 2.6.3 Fixed issue where getCurrentMagicProperties was not being used for source elements
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
-	const _version = '2.6.2';
+	const _version = '2.6.3';
 	let _default = {
 		easingMap: {
 			'easein': 'power1.in',
@@ -112,6 +113,23 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 		
 		return properties;
 	}
+
+	/**
+	 * Gets the current magic properties by reading the element's inline style attribute.
+	 * This uses the same direct-read mechanism as the caching function.
+	 * @param {HTMLElement} element - The element to get live properties for.
+	 * @returns {Object} Object containing the element's current inline style properties.
+	 */
+		function getCurrentMagicProperties(element) {
+			const properties = {};
+			const defaultProperties = getDefault('defaultProperties');
+			for (let key in defaultProperties) {
+				if (getDefault('skipProperties').includes(key)) continue;
+				// Read the current value directly from the inline style attribute.
+				properties[key] = element.style[key] || defaultProperties[key];
+			}
+			return properties;
+		}
 
 	/**
 	 * Clears the cached properties for an element or all cached properties if no element is provided
@@ -527,7 +545,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 						elementsToRestore.add(sourceElement);
 						
 						// Get and cache initial properties of both elements
-						const fromProperties = getCachedMagicProperties(sourceElement);
+						const fromProperties = getCurrentMagicProperties(sourceElement);
 						const toProperties = getCachedMagicProperties(targetElement);
 
 						// Helper function to get attribute value from source or target element
