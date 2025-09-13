@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.6.3 (GSAP Version)
+ * Hype SceneMagic 2.6.4 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -35,10 +35,11 @@
  * 2.6.2 Added skipProperties to default configuration to skip properties from being tweened like fontFamily
  *       Fixed issue when delays and durations exceeded into next magic transition by ending previous master timeline
  * 2.6.3 Fixed issue where getCurrentMagicProperties was not being used for source elements
+ * 2.6.4 Refactored property caching and getting for clarity and robustness
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
-	const _version = '2.6.3';
+	const _version = '2.6.4';
 	let _default = {
 		easingMap: {
 			'easein': 'power1.in',
@@ -83,53 +84,60 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 	};
 
 	// Add WeakMap for storing initial properties
-	const _initialPropertiesCache = new WeakMap();
+	let _initialPropertiesCache = new WeakMap();
 
 	// store document related state
 	const _documentStates = new WeakMap(); 
 
 	/**
-	 * Gets computed style properties for an element with caching
-	 * @param {HTMLElement} element - The element to get properties for
-	 * @param {boolean} [force=false] - Force recalculation of properties
-	 * @returns {Object} Object containing style properties
+	 * PRIVATE: Reads the live inline style properties of an element.
+	 * This is the core logic used by both caching and getting current properties.
+	 * @param {HTMLElement} element - The element to get live properties for.
+	 * @returns {Object} Object containing the element's current inline style properties.
 	 */
-	function getCachedMagicProperties(element, force = false) {
-		// Check cache first
-		if (!force && _initialPropertiesCache.has(element)) {
-			return _initialPropertiesCache.get(element);
-		}
-
-		// Calculate properties
-		let properties = {};
-		let defaultProperties = getDefault('defaultProperties');
+	function _readLiveProperties(element) {
+		const properties = {};
+		const defaultProperties = getDefault('defaultProperties');
 		for (let key in defaultProperties) {
 			if (getDefault('skipProperties').includes(key)) continue;
+			// Read the current value directly from the inline style attribute.
 			properties[key] = element.style[key] || defaultProperties[key];
 		}
-
-		// Store in cache
-		_initialPropertiesCache.set(element, properties);
-		
 		return properties;
 	}
 
 	/**
-	 * Gets the current magic properties by reading the element's inline style attribute.
-	 * This uses the same direct-read mechanism as the caching function.
+	 * Caches the initial properties of an element if not already cached.
+	 * This function is called for its side-effect of populating the cache.
+	 * @param {HTMLElement} element - The element to cache properties for.
+	 * @param {boolean} [force=false] - If true, overwrites any existing cache entry.
+	 * @returns {void}
+	 */
+	function cacheInitialProperties(element, force = false) {
+		if (force || !_initialPropertiesCache.has(element)) {
+			_initialPropertiesCache.set(element, _readLiveProperties(element));
+		}
+	}
+
+	/**
+	 * Gets the previously cached initial properties for an element.
+	 * Assumes `cacheInitialProperties` has been called at an appropriate time.
+	 * @param {HTMLElement} element - The element to get properties for.
+	 * @returns {Object | undefined} The cached properties object, or undefined if not cached.
+	 */
+	function getInitialProperties(element) {
+		return _initialPropertiesCache.get(element);
+	}
+
+	/**
+	 * Gets the current live magic properties of an element.
+	 * This is a direct, non-cached read of the element's state.
 	 * @param {HTMLElement} element - The element to get live properties for.
 	 * @returns {Object} Object containing the element's current inline style properties.
 	 */
-		function getCurrentMagicProperties(element) {
-			const properties = {};
-			const defaultProperties = getDefault('defaultProperties');
-			for (let key in defaultProperties) {
-				if (getDefault('skipProperties').includes(key)) continue;
-				// Read the current value directly from the inline style attribute.
-				properties[key] = element.style[key] || defaultProperties[key];
-			}
-			return properties;
-		}
+	function getCurrentMagicProperties(element) {
+		return _readLiveProperties(element);
+	}
 
 	/**
 	 * Clears the cached properties for an element or all cached properties if no element is provided
@@ -139,7 +147,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 		if (element) {
 			_initialPropertiesCache.delete(element);
 		} else {
-			_initialPropertiesCache.clear();
+			_initialPropertiesCache = new WeakMap();
 		}
 	}
 
@@ -465,8 +473,8 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 							// Reset properties for all elements that need restoration after a frame delay
 							requestAnimationFrame(() => {
 								elementsToRestore.forEach(element => {
-									const initialProps = getCachedMagicProperties(element);
-									gsap.set(element, initialProps);
+									const initialProps = getInitialProperties(element);
+									if (initialProps) gsap.set(element, initialProps);
 								});
 							});
 
@@ -544,9 +552,16 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 						// Add source element to restore list
 						elementsToRestore.add(sourceElement);
 						
-						// Get and cache initial properties of both elements
+						// Ensure the initial states are cached for later restoration.
+						cacheInitialProperties(sourceElement);
+						cacheInitialProperties(targetElement);
+						
+						// Get the LIVE properties from the source element for a smooth transition start.
 						const fromProperties = getCurrentMagicProperties(sourceElement);
-						const toProperties = getCachedMagicProperties(targetElement);
+
+						// Get the CACHED initial properties of the target for the transition's end state.
+						const toProperties = getInitialProperties(targetElement);
+
 
 						// Helper function to get attribute value from source or target element
 						function getAttributeValue(attr, defaultValue) {
@@ -625,7 +640,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
 							if (animationData) {
 								// Get initial properties to make sure they are cached
-								getCachedMagicProperties(targetElement);
+								cacheInitialProperties(targetElement);
 
 								const delayPercentage = targetElement.getAttribute('data-transition-delay') || 0;
 								const durationPercentage = targetElement.getAttribute('data-transition-duration') || 1;
@@ -682,7 +697,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 							
 							if (animationData) {
 								// Get initial properties to make sure they are cached
-								getCachedMagicProperties(sourceElement);
+								cacheInitialProperties(sourceElement);
 								
 								const delayPercentage = sourceElement.getAttribute('data-transition-delay') || 0;
 								const durationPercentage = sourceElement.getAttribute('data-transition-duration') || 1;
@@ -714,7 +729,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 					elementsToRestore.add(element);
 					
 					// Get and cache initial properties
-					getCachedMagicProperties(element);
+					cacheInitialProperties(element);
 
 					// Kill any existing animations
 					gsap.killTweensOf(element);
