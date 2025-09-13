@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.6.4 (GSAP Version)
+ * Hype SceneMagic 2.6.5 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -36,10 +36,11 @@
  *       Fixed issue when delays and durations exceeded into next magic transition by ending previous master timeline
  * 2.6.3 Fixed issue where getCurrentMagicProperties was not being used for source elements
  * 2.6.4 Refactored property caching and getting for clarity and robustness
+ * 2.6.5 Added two-cache system: pristine for initial state, restore for per-transition state.
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
-	const _version = '2.6.4';
+	const _version = '2.6.5';
 	let _default = {
 		easingMap: {
 			'easein': 'power1.in',
@@ -83,71 +84,40 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 		skipProperties: ['fontFamily'],
 	};
 
-	// Add WeakMap for storing initial properties
-	let _initialPropertiesCache = new WeakMap();
+	// --- Two-Cache System ---
+	// The master cache, populated on scene prepare with true initial states.
+	let _pristineElementCache = new WeakMap(); 
+	// A temporary cache built for each transition, listing elements to be restored.
+	let _restoreElementCache = new WeakMap();
 
 	// store document related state
-	const _documentStates = new WeakMap(); 
+	const _documentStates = new WeakMap();
 
 	/**
-	 * PRIVATE: Reads the live inline style properties of an element.
-	 * This is the core logic used by both caching and getting current properties.
+	 * Gets the current magic properties by reading the element's inline style attribute.
+	 * This is a direct, non-cached read of the element's live state.
 	 * @param {HTMLElement} element - The element to get live properties for.
 	 * @returns {Object} Object containing the element's current inline style properties.
 	 */
-	function _readLiveProperties(element) {
+	function getCurrentMagicProperties(element) {
 		const properties = {};
 		const defaultProperties = getDefault('defaultProperties');
 		for (let key in defaultProperties) {
 			if (getDefault('skipProperties').includes(key)) continue;
-			// Read the current value directly from the inline style attribute.
 			properties[key] = element.style[key] || defaultProperties[key];
 		}
 		return properties;
 	}
 
 	/**
-	 * Caches the initial properties of an element if not already cached.
-	 * This function is called for its side-effect of populating the cache.
-	 * @param {HTMLElement} element - The element to cache properties for.
-	 * @param {boolean} [force=false] - If true, overwrites any existing cache entry.
-	 * @returns {void}
-	 */
-	function cacheInitialProperties(element, force = false) {
-		if (force || !_initialPropertiesCache.has(element)) {
-			_initialPropertiesCache.set(element, _readLiveProperties(element));
-		}
-	}
-
-	/**
-	 * Gets the previously cached initial properties for an element.
-	 * Assumes `cacheInitialProperties` has been called at an appropriate time.
-	 * @param {HTMLElement} element - The element to get properties for.
-	 * @returns {Object | undefined} The cached properties object, or undefined if not cached.
-	 */
-	function getInitialProperties(element) {
-		return _initialPropertiesCache.get(element);
-	}
-
-	/**
-	 * Gets the current live magic properties of an element.
-	 * This is a direct, non-cached read of the element's state.
-	 * @param {HTMLElement} element - The element to get live properties for.
-	 * @returns {Object} Object containing the element's current inline style properties.
-	 */
-	function getCurrentMagicProperties(element) {
-		return _readLiveProperties(element);
-	}
-
-	/**
-	 * Clears the cached properties for an element or all cached properties if no element is provided
-	 * @param {HTMLElement} [element] - Optional element to clear cache for. If not provided, clears entire cache
+	 * Clears the pristine cached properties for an element or all cached properties if no element is provided.
+	 * @param {HTMLElement} [element] - Optional element to clear cache for. If not provided, clears entire cache.
 	 */
 	function clearCachedMagicProperties(element) {
 		if (element) {
-			_initialPropertiesCache.delete(element);
+			_pristineElementCache.delete(element);
 		} else {
-			_initialPropertiesCache = new WeakMap();
+			_pristineElementCache = new WeakMap();
 		}
 	}
 
@@ -424,6 +394,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			// If target scene element doesn't exist abort
 			if (targetSceneElm === null) return;
 			
+			// Clear the temporary restore cache at the start of every transition
+			_restoreElementCache = new WeakMap();
+			
 			// Get duration and cross fade factor
 			duration = duration || getDefault('durationTransition');
 			const crossFadeFactor = options.crossFadeFactor !== undefined ? options.crossFadeFactor : getDefault('crossFadeFactor');
@@ -473,7 +446,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 							// Reset properties for all elements that need restoration after a frame delay
 							requestAnimationFrame(() => {
 								elementsToRestore.forEach(element => {
-									const initialProps = getInitialProperties(element);
+									const initialProps = _restoreElementCache.get(element);
 									if (initialProps) gsap.set(element, initialProps);
 								});
 							});
@@ -531,6 +504,15 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
 			// Store references to elements that need restoration
 			const elementsToRestore = new Set();
+			
+			// Helper function to prepare an element for restoration by copying its pristine
+			// state into the temporary restore cache.
+			const prepareForRestoration = (element) => {
+				if (_pristineElementCache.has(element) && !_restoreElementCache.has(element)) {
+					_restoreElementCache.set(element, _pristineElementCache.get(element));
+				}
+				elementsToRestore.add(element);
+			};
 
 			// Handle elements in target scene that are also in source scene
 			targetMagicElms.forEach(targetElement => {
@@ -549,19 +531,14 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 						// Kill any existing animations
 						gsap.killTweensOf([targetElement, sourceElement]);
 						
-						// Add source element to restore list
-						elementsToRestore.add(sourceElement);
-						
-						// Ensure the initial states are cached for later restoration.
-						cacheInitialProperties(sourceElement);
-						cacheInitialProperties(targetElement);
+						// Prepare the source element to be restored to its pristine state.
+						prepareForRestoration(sourceElement);
 						
 						// Get the LIVE properties from the source element for a smooth transition start.
 						const fromProperties = getCurrentMagicProperties(sourceElement);
 
-						// Get the CACHED initial properties of the target for the transition's end state.
-						const toProperties = getInitialProperties(targetElement);
-
+						// Get the PRISTINE properties of the target for the transition's end state.
+						const toProperties = _pristineElementCache.get(targetElement) || getCurrentMagicProperties(targetElement);
 
 						// Helper function to get attribute value from source or target element
 						function getAttributeValue(attr, defaultValue) {
@@ -639,9 +616,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 							}
 
 							if (animationData) {
-								// Get initial properties to make sure they are cached
-								cacheInitialProperties(targetElement);
-
 								const delayPercentage = targetElement.getAttribute('data-transition-delay') || 0;
 								const durationPercentage = targetElement.getAttribute('data-transition-duration') || 1;
 								const timing = calculateTimingValues(delayPercentage, durationPercentage, duration);
@@ -673,7 +647,8 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 
 					// If no matching element is found
 					if (!hasMatch) {
-						elementsToRestore.add(sourceElement);
+						// Prepare the source element to be restored to its pristine state.
+						prepareForRestoration(sourceElement);
 						
 						// Kill any existing animations
 						gsap.killTweensOf(sourceElement);
@@ -696,9 +671,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 							}
 							
 							if (animationData) {
-								// Get initial properties to make sure they are cached
-								cacheInitialProperties(sourceElement);
-								
 								const delayPercentage = sourceElement.getAttribute('data-transition-delay') || 0;
 								const durationPercentage = sourceElement.getAttribute('data-transition-duration') || 1;
 								const timing = calculateTimingValues(delayPercentage, durationPercentage, duration);
@@ -725,12 +697,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 								element.getAttribute('data-transition-animation');
 				
 				if (animation) {
-					// Add element to restore list
-					elementsToRestore.add(element);
+					// Prepare the element to be restored to its pristine state.
+					prepareForRestoration(element);
 					
-					// Get and cache initial properties
-					cacheInitialProperties(element);
-
 					// Kill any existing animations
 					gsap.killTweensOf(element);
 					
@@ -889,8 +858,31 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 		
 	}
 
+	/**
+	 * Populates the pristine cache with the true initial state of all potential transition elements.
+	 * This fires at the earliest possible moment, before the scene is fully displayed.
+	 * @param {Object} hypeDocument - The Hype document instance
+	 * @param {HTMLElement} element - The Scene element
+	 * @param {Event} event - The prepare for display event
+	 */
+	function HypeScenePrepareForDisplay(hypeDocument, element, event) {
+		const sceneElm = element; // The 'element' argument IS the scene element
+		if (sceneElm) {
+			const transitionElements = sceneElm.querySelectorAll('div[class*="magic"], div[data-transition-id], [data-transition-animation], [data-transition-animation-from], [data-transition-animation-to]');
+			
+			transitionElements.forEach(el => {
+				// This populates the pristine cache with the as-designed state.
+				// We only set it if it doesn't already exist to be efficient.
+				if (!_pristineElementCache.has(el)) {
+					_pristineElementCache.set(el, getCurrentMagicProperties(el));
+				}
+			});
+		}
+	}
+
 	if ("HYPE_eventListeners" in window === false) window.HYPE_eventListeners = Array();
 	window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
+	window.HYPE_eventListeners.push({ "type": "HypeScenePrepareForDisplay", "callback": HypeScenePrepareForDisplay });
 
 	return {
 		version: _version,
