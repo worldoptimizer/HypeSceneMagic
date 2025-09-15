@@ -685,7 +685,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                             });
                         }
 
-						console.log(`ID: ${targetIds.join(', ')}`, "---", fromProperties, toProperties);
 						// Add fromTo tweens to element timeline
 						elementTimeline.fromTo(targetElement, fromProperties, {
 							...toProperties,
