@@ -38,6 +38,7 @@
  * 2.6.4 Refactored property caching and getting for clarity and robustness
  * 2.6.5 Added two-cache system: pristine for initial state, restore for per-transition state.
  * 2.7.0 Added decomposeTransform and autoDimensions flags. Implemented robust rotation synchronization and proactive auto-dimension resolving.
+ *       Added magicCard shorthand for powerful scene navigation with support for next/previous and relative scene names.
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
@@ -420,6 +421,12 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			
 			// Avoid unnecessary calculations if target scene is the same as the current scene
 			if (targetSceneName === currentSceneName) return;
+
+			// Validate that the target scene exists before proceeding
+			if (!this.sceneNames().includes(targetSceneName)) {
+				console.warn('HypeSceneMagic: Target scene "' + targetSceneName + '" not found.');
+				return;
+			}
 			
 			// Get current layout info
 			const currentLayouts = this.layoutsForSceneNamed(currentSceneName);
@@ -448,9 +455,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			// Get scene elements using correct indices
 			const currentSceneElm = document.querySelector(`#${this.documentId()} > [hype_scene_index="${currentSceneIdx}"]`);
 			const targetSceneElm = document.querySelector(`#${this.documentId()} > [hype_scene_index="${targetSceneIdx}"]`);
-
-			// If target scene element doesn't exist abort
-			if (targetSceneElm === null) return;
 			
 			// Clear the temporary restore cache at the start of every transition
 			_restoreElementCache = new WeakMap();
@@ -843,6 +847,64 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 				_documentStates.set(hypeDocument, {});
 			}
 			_documentStates.get(hypeDocument).masterTimeline = masterTimeline;
+		}
+
+		/**
+		 * Shorthand for navigating scenes with magic transitions.
+		 * @param {string} name Navigation target:
+		 *   - '>' or '<': Navigate to the next/previous scene in sequence.
+		 *   - '>BaseName' or '<BaseName': Navigate to the next/previous scene matching the base name.
+		 *   - 'SceneName': Direct navigation to a specific scene.
+		 * @param {Object|number} [options] - Navigation options. Can be an object or a number for duration.
+		 */
+		if (!hypeDocument.magicCard) {
+			hypeDocument.magicCard = function(name, options) {
+				options = options || {};
+
+				// Handle duration as a number
+				if (typeof options === 'number') {
+					options = { duration: options };
+				}
+
+				// Default to next scene if name is not provided
+				if (!name) name = '>';
+
+				const sceneNames = this.sceneNames();
+				const currentSceneName = this.currentSceneName();
+				const currentIndex = sceneNames.indexOf(currentSceneName);
+				let targetSceneName = null;
+
+				if (name === '>' || name === '<') {
+					const step = name === '>' ? 1 : -1;
+					const targetIndex = (currentIndex + step + sceneNames.length) % sceneNames.length;
+					targetSceneName = sceneNames[targetIndex];
+
+				} else if (name.startsWith('>') || name.startsWith('<')) {
+					const direction = name.charAt(0);
+					const baseName = name.substring(1);
+					const step = direction === '>' ? 1 : -1;
+
+					for (let i = 1; i <= sceneNames.length; i++) {
+						const index = (currentIndex + (step * i) + sceneNames.length) % sceneNames.length;
+						if (sceneNames[index].startsWith(baseName)) {
+							targetSceneName = sceneNames[index];
+							break;
+						}
+					}
+
+                    if (!targetSceneName) {
+                        console.warn('HypeSceneMagic: Can not resolve target scene for "' + name + '".');
+                        return;
+                    }
+
+				} else {
+					targetSceneName = name;
+				}
+
+				if (targetSceneName) {
+					this.showSceneNamedMagic(targetSceneName, options.duration, options.ease, options);
+				}
+			};
 		}
 
 		/**
