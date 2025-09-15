@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.6.5 (GSAP Version)
+ * Hype SceneMagic 2.7.0 (GSAP Version)
  * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -37,10 +37,11 @@
  * 2.6.3 Fixed issue where getCurrentMagicProperties was not being used for source elements
  * 2.6.4 Refactored property caching and getting for clarity and robustness
  * 2.6.5 Added two-cache system: pristine for initial state, restore for per-transition state.
+ * 2.7.0 Added decomposeTransform and autoDimensions flags. Implemented robust rotation synchronization and proactive auto-dimension resolving.
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
-	const _version = '2.6.5';
+	const _version = '2.7.0';
 	let _default = {
 		easingMap: {
 			'easein': 'power1.in',
@@ -82,6 +83,8 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			zIndex: 'z-index'
 		},
 		skipProperties: ['fontFamily'],
+		decomposeTransform: true,
+		autoDimensions: true,
 	};
 
 	// --- Two-Cache System ---
@@ -324,6 +327,61 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 	 * @param {HTMLElement} element - The document element
 	 * @param {Event} event - The load event
 	 */
+	/**
+	 * Extracts and strips rotation properties from a CSS transform string.
+	 * @param {string} transform - The CSS transform string.
+	 * @returns {{rotations: Object, transform: string}} An object containing the extracted rotations and the transform string with rotations removed.
+	 */
+	function extractAndStripRotations(transform) {
+	    if (!transform) {
+	        return { rotations: {}, transform: '' };
+	    }
+	    const rotations = {};
+	    const rotationRegex = /(rotate[XYZ]?|rotate)\(([^)]+)\)/g;
+	    const newTransform = transform.replace(rotationRegex, (match, key, value) => {
+	        rotations[key] = value;
+	        return ''; // Remove the rotation from the string
+	    }).trim();
+	    return { rotations, transform: newTransform };
+	}
+
+	/**
+	 * Normalizes an angle to the range [-180, 180].
+	 * @param {number} angle - The angle in degrees.
+	 * @returns {number} The normalized angle.
+	 */
+	/**
+	 * Resolves 'auto' dimensions for a set of elements by measuring and setting them explicitly.
+	 * This should be called within a requestAnimationFrame to ensure layout is complete.
+	 * @param {NodeList} elements - A list of elements to process.
+	 */
+	function resolveAutoDimensions(elements) {
+	    elements.forEach(el => {
+	        const pristineProps = _pristineElementCache.get(el);
+	        if (!pristineProps) return;
+
+	        ['width', 'height'].forEach(key => {
+	            if (pristineProps[key] === 'auto') {
+	                const measuredValue = el['offset' + key.charAt(0).toUpperCase() + key.slice(1)] + 'px';
+	                // Update the live element's style
+	                el.style[key] = measuredValue;
+	                // Update the pristine cache with the resolved value
+	                pristineProps[key] = measuredValue;
+	            }
+	        });
+	    });
+	}
+
+	function normalizeAngle(angle) {
+	    let newAngle = angle % 360;
+	    if (newAngle > 180) {
+	        newAngle -= 360;
+	    } else if (newAngle <= -180) {
+	        newAngle += 360;
+	    }
+	    return newAngle;
+	}
+
 	function HypeDocumentLoad(hypeDocument, element, event) {
 		const hypeDocElm = element;
 		addMagicTransitionCSS();
@@ -540,6 +598,7 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 						// Get the PRISTINE properties of the target for the transition's end state.
 						const toProperties = _pristineElementCache.get(targetElement) || getCurrentMagicProperties(targetElement);
 
+
 						// Helper function to get attribute value from source or target element
 						function getAttributeValue(attr, defaultValue) {
 							let sourceValue = sourceElement.getAttribute(attr);
@@ -578,6 +637,51 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 							}
 						});
 
+
+                        if (getDefault('decomposeTransform')) {
+                            // Extract and strip rotations, then merge them into the properties objects
+                            const from = extractAndStripRotations(fromProperties.transform);
+                            Object.assign(fromProperties, from.rotations);
+                            fromProperties.transform = from.transform;
+
+                            const to = extractAndStripRotations(toProperties.transform);
+                            Object.assign(toProperties, to.rotations);
+                            toProperties.transform = to.transform;
+
+                            // Normalize angles and use shortest path for robust rotation
+                            ['rotate', 'rotateX', 'rotateY', 'rotateZ'].forEach(key => {
+                                const fromValue = parseFloat(fromProperties[key]) || 0;
+                                const toValue = parseFloat(toProperties[key]) || 0;
+
+                                // Normalize angles to the [-180, 180] range
+                                const normFrom = normalizeAngle(fromValue);
+                                const normTo = normalizeAngle(toValue);
+                                let delta = normTo - normFrom;
+
+                                // Find the shortest path
+                                if (delta > 180) {
+                                    delta -= 360;
+                                } else if (delta < -180) {
+                                    delta += 360;
+                                }
+
+                                if (delta !== 0) {
+                                    // Set the 'from' state and animate by the relative delta
+                                    fromProperties[key] = normFrom + 'deg';
+                                    toProperties[key] = `+=${delta}`;
+                                }
+                            });
+
+                            // Filter out 'auto' width/height to prevent GSAP from animating them
+                            ['width', 'height'].forEach(key => {
+                                if (fromProperties[key] === 'auto' && toProperties[key] === 'auto') {
+                                    delete fromProperties[key];
+                                    delete toProperties[key];
+                                }
+                            });
+                        }
+
+						console.log(`ID: ${targetIds.join(', ')}`, "---", fromProperties, toProperties);
 						// Add fromTo tweens to element timeline
 						elementTimeline.fromTo(targetElement, fromProperties, {
 							...toProperties,
@@ -877,6 +981,13 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 					_pristineElementCache.set(el, getCurrentMagicProperties(el));
 				}
 			});
+
+			// Proactively resolve auto dimensions if the feature is enabled
+			if (getDefault('autoDimensions')) {
+				requestAnimationFrame(() => {
+					resolveAutoDimensions(transitionElements);
+				});
+			}
 		}
 	}
 
