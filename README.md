@@ -112,6 +112,49 @@ This means the element will use the `data-transition-delay` and `data-transition
 ---
 
 
+## Shorthand Scene Navigation with `magicCard`
+
+For more streamlined and powerful scene navigation, SceneMagic provides the `hypeDocument.magicCard` function. This shorthand is especially useful for creating sequential or logic-based flows, like slideshows or interactive stories, by building on top of `showSceneNamedMagic`.
+
+```javascript
+hypeDocument.magicCard(name, options);
+```
+
+### Navigation Targets
+
+The `name` parameter accepts several formats to define the navigation target:
+
+| `name` Value | Description |
+|--------------|-------------|
+| `'>'` | Navigates to the **next** scene in the document's scene order. Wraps around to the first scene if at the end. |
+| `'<'` | Navigates to the **previous** scene in the document's scene order. Wraps around to the last scene if at the beginning. |
+| `'>BaseName'` | Navigates to the **next** scene whose name starts with `BaseName`. |
+| `'<BaseName'` | Navigates to the **previous** scene whose name starts with `BaseName`. |
+| `'SceneName'` | Navigates directly to the scene with the specified name. |
+
+### Options
+
+The `options` parameter can be either an `Object` containing transition settings or a `Number` to specify the duration directly. All options are passed through to `showSceneNamedMagic`.
+
+```javascript
+// Navigate to the next scene over 1.5 seconds
+hypeDocument.magicCard('>', 1.5);
+
+// Navigate to the previous scene with custom options
+hypeDocument.magicCard('<', {
+    duration: 0.8,
+    ease: 'bounce.out',
+    crossFadeFactor: 0.3
+});
+
+// Navigate to the next scene starting with "Chapter2"
+hypeDocument.magicCard('>Chapter2');
+```
+
+---
+
+
+
 ### Multiple Magic Identifiers & Match Resolution
 
 SceneMagic 2.6.0 introduces support for multiple magic identifiers per element through both class names and data attributes. Elements can now be tagged with multiple identifiers that are matched case-insensitively across scenes:
