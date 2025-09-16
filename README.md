@@ -423,19 +423,31 @@ hypeDocument.applyAnimation(element, "bounceIn");
 | `skipHypeSync` | Boolean | Skip syncing final values to Hype properties | false |
 | `onComplete` | Function | Callback when animation completes | null |
 
+
+## Prod-Version
+
+The `prod` (production) version is optimized for live environments and disables previews within the Hype editor by default. This provides a cleaner editing experience. In development versions, you can achieve the same behavior and disable IDE previews by using the `HypeSceneMagic.setDefault` command.
+
+Here is an example of how you would disable IDE previews in the regular version (full or minified):
+
+```javascript
+HypeSceneMagic.setDefault('highlightSceneMagic', false);
+```
+
 ---
 
 ## Best Practices
 
-- **Consistent Identifiers**: Ensure that matching elements across scenes have the same identifier (class name or `data-transition-id`). Remember that identifiers are case-insensitive and exclude the `magic` prefix.
-- **Fallback Animations**: Use fallback attributes to define how unmatched elements should appear or disappear during transitions.
-- **Performance Optimization**: Limit the number of elements with complex animations to maintain smooth performance.
-- **Testing Transitions**: Test transitions on different devices and browsers to ensure consistency.
+-   **Consistent Identifiers**: Ensure that matching elements across scenes have the same identifier (class name or `data-transition-id`). Remember that identifiers are case-insensitive and exclude the `magic` prefix.
+-   **Fallback Animations**: Use fallback attributes to define how unmatched elements should appear or disappear during transitions.
+-   **Performance Optimization**: Limit the number of elements with complex animations to maintain smooth performance.
+-   **Testing Transitions**: Test transitions on different devices and browsers to ensure consistency.
 
 ---
 
 ## Troubleshooting
 
+- **Managing Timeline Overlaps**: Be mindful of scene transitions that might overlap with the start of the next scene's main timeline, as this can cause unexpected animation behavior. You can usually resolve these issues by inspecting the transition durations and either extending the Hype timeline or adjusting the delays and durations on your magic transitions to ensure a clean handoff. You will be warned about timneline overlaps in the console with further actionable details.
 - **Elements Not Matching**: Verify that identifiers are correctly assigned, case-insensitive, and exclude the `magic` prefix.
 - **Animations Not Playing**: Check for JavaScript errors in the console and ensure GSAP is correctly included.
 - **Z-Index Issues**: Use `data-transition-order` to manage stacking contexts during transitions.
@@ -452,5 +464,6 @@ hypeDocument.applyAnimation(element, "bounceIn");
 ---
 
 With Hype Scene Magic, you can create engaging and dynamic animations in Tumult Hype effortlessly. By leveraging GSAP's robust animation capabilities, SceneMagic offers precise control over scene transitions, allowing for creativity and interactivity in your projects.
+
 
 Happy animating!
