@@ -32,8 +32,7 @@
  *       Removed match tracking in favor of "last match wins" approach (using killTweensOf)
  *       Added onTransitionPrepare callback and moved onTransitionStart to timeline start
  * 2.6.1 Fixed issue where non-magic elements with data-transition-animation weren't being properly restored
- * 2.6.2 Added skipProperties to default configuration to skip properties from being tweened like fontFamily
- *       Fixed issue when delays and durations exceeded into next magic transition by ending previous master timeline
+ * 2.6.2 Fixed issue when delays and durations exceeded into next magic transition by ending previous master timeline
  * 2.6.3 Fixed issue where getCurrentMagicProperties was not being used for source elements
  * 2.6.4 Refactored property caching and getting for clarity and robustness
  * 2.6.5 Added two-cache system: pristine for initial state, restore for per-transition state.
