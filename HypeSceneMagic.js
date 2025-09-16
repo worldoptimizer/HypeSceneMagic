@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.7.0 (GSAP Version)
+ * Hype SceneMagic 2.7.1 (GSAP Version)
  * Copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -32,18 +32,19 @@
  *       Removed match tracking in favor of "last match wins" approach (using killTweensOf)
  *       Added onTransitionPrepare callback and moved onTransitionStart to timeline start
  * 2.6.1 Fixed issue where non-magic elements with data-transition-animation weren't being properly restored
- * 2.6.2 Fixed issue when delays and durations exceeded into next magic transition by ending previous master timeline
+ * 2.6.2 Added skipProperties to default configuration to skip properties from being tweened like fontFamily
+ *       Fixed issue when delays and durations exceeded into next magic transition by ending previous master timeline
  * 2.6.3 Fixed issue where getCurrentMagicProperties was not being used for source elements
  * 2.6.4 Refactored property caching and getting for clarity and robustness
  * 2.6.5 Added two-cache system: pristine for initial state, restore for per-transition state.
  * 2.7.0 Added decomposeTransform flag. Implemented robust rotation synchronization.
  *       Added magicCard shorthand for powerful scene navigation with support for next/previous and relative scene names.
- *       Added Hype IDE specific code to show visual indicators for magic elements.
+ * 2.7.1 Added Hype IDE specific code to show visual indicators for magic elements.
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
     const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
-	const _version = '2.7.0';
+	const _version = '2.7.1';
 	let _default = {
 		easingMap: {
 			'easein': 'power1.in',
