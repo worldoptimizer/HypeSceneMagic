@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.7.1 (GSAP Version)
+ * Hype SceneMagic 2.7.2 (GSAP Version)
  * Copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -40,11 +40,12 @@
  * 2.7.0 Added decomposeTransform flag. Implemented robust rotation synchronization.
  *       Added magicCard shorthand for powerful scene navigation with support for next/previous and relative scene names.
  * 2.7.1 Added Hype IDE specific code to show visual indicators for magic elements.
+ * 2.7.2 Removed angle normalization and shortest path logic for rotation.
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
     const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
-	const _version = '2.7.1';
+	const _version = '2.7.2';
 	let _default = {
 		easingMap: {
 			'easein': 'power1.in',
@@ -401,21 +402,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 	    return { rotations, transform: newTransform };
 	}
 
-	/**
-	 * Normalizes an angle to the range [-180, 180].
-	 * @param {number} angle - The angle in degrees.
-	 * @returns {number} The normalized angle.
-	 */
-	function normalizeAngle(angle) {
-	    let newAngle = angle % 360;
-	    if (newAngle > 180) {
-	        newAngle -= 360;
-	    } else if (newAngle <= -180) {
-	        newAngle += 360;
-	    }
-	    return newAngle;
-	}
-
 	function HypeDocumentLoad(hypeDocument, element, event) {
 		const hypeDocElm = element;
 		addMagicTransitionCSS();
@@ -692,27 +678,20 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
                             Object.assign(toProperties, to.rotations);
                             toProperties.transform = to.transform;
 
-                            // Normalize angles and use shortest path for robust rotation
+                            // Handle rotation properties
                             ['rotate', 'rotateX', 'rotateY', 'rotateZ'].forEach(key => {
                                 const fromValue = parseFloat(fromProperties[key]) || 0;
                                 const toValue = parseFloat(toProperties[key]) || 0;
-
-                                // Normalize angles to the [-180, 180] range
-                                const normFrom = normalizeAngle(fromValue);
-                                const normTo = normalizeAngle(toValue);
-                                let delta = normTo - normFrom;
-
-                                // Find the shortest path
-                                if (delta > 180) {
-                                    delta -= 360;
-                                } else if (delta < -180) {
-                                    delta += 360;
-                                }
+                                const delta = toValue - fromValue;
 
                                 if (delta !== 0) {
                                     // Set the 'from' state and animate by the relative delta
-                                    fromProperties[key] = normFrom + 'deg';
+                                    fromProperties[key] = fromValue + 'deg';
                                     toProperties[key] = `+=${delta}`;
+                                } else {
+                                    // If there's no change, remove the properties to avoid unnecessary tweening
+                                    delete fromProperties[key];
+                                    delete toProperties[key];
                                 }
                             });
 
