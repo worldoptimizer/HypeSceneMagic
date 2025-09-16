@@ -1,5 +1,5 @@
 /*!
- * Hype SceneMagic 2.7.2 (GSAP Version)
+ * Hype SceneMagic 2.7.3 (GSAP Version)
  * Copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
@@ -41,11 +41,12 @@
  *       Added magicCard shorthand for powerful scene navigation with support for next/previous and relative scene names.
  * 2.7.1 Added Hype IDE specific code to show visual indicators for magic elements.
  * 2.7.2 Removed angle normalization and shortest path logic for rotation.
+ * 2.7.3 Added logic to recover lost rotation values from the pristine cache.
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
     const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
-	const _version = '2.7.2';
+	const _version = '2.7.3';
 	let _default = {
 		easingMap: {
 			'easein': 'power1.in',
@@ -624,6 +625,28 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 						
 						// Get the LIVE properties from the source element for a smooth transition start.
 						const fromProperties = getCurrentMagicProperties(sourceElement);
+
+						// Then, check the pristine cache to recover any lost rotation values (e.g., 360deg becoming 0deg).
+						const pristineFromProperties = _pristineElementCache.get(sourceElement);
+						if (pristineFromProperties && pristineFromProperties.transform) {
+							// Create a safe copy to avoid mutating the cache
+							const pristineCopy = { ...pristineFromProperties };
+							
+							// Decompose the transform to access rotation values
+							const { rotations } = extractAndStripRotations(pristineCopy.transform);
+							Object.assign(pristineCopy, rotations);
+
+							// If the live transform does NOT contain a rotation, check the pristine cache to recover one under specific conditions.
+							if (fromProperties.transform && !fromProperties.transform.includes('rotate')) {
+								['rotate', 'rotateX', 'rotateY', 'rotateZ'].forEach(key => {
+									const pristineRotation = parseFloat(pristineCopy[key]) || 0;
+									// If the pristine rotation was a non-zero multiple of 360, restore it.
+									if (pristineRotation !== 0 && pristineRotation % 360 === 0) {
+										fromProperties[key] = pristineRotation + 'deg';
+									}
+								});
+							}
+						}
 
 						// Get the PRISTINE properties of the target for the transition's end state.
                         // Use spread syntax {...} to create a shallow COPY. This is critical to prevent
