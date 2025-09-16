@@ -1,6 +1,6 @@
 /*!
  * Hype SceneMagic 2.7.0 (GSAP Version)
- * Copyright (c) 2024 Max Ziebell, (https://maxziebell.de). MIT-license
+ * Copyright (c) 2025 Max Ziebell, (https://maxziebell.de). MIT-license
  * Requires GSAP animation library (https://greensock.com/gsap/)
  */
 
@@ -37,11 +37,13 @@
  * 2.6.3 Fixed issue where getCurrentMagicProperties was not being used for source elements
  * 2.6.4 Refactored property caching and getting for clarity and robustness
  * 2.6.5 Added two-cache system: pristine for initial state, restore for per-transition state.
- * 2.7.0 Added decomposeTransform and autoDimensions flags. Implemented robust rotation synchronization and proactive auto-dimension resolving.
+ * 2.7.0 Added decomposeTransform flag. Implemented robust rotation synchronization.
  *       Added magicCard shorthand for powerful scene navigation with support for next/previous and relative scene names.
+ *       Added Hype IDE specific code to show visual indicators for magic elements.
  */
 
 if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function() {	
+    const _isHypeIDE = window.location.href.indexOf("/Hype/Scratch/HypeScratch.") != -1;
 	const _version = '2.7.0';
 	let _default = {
 		easingMap: {
@@ -59,7 +61,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			backgroundColor: 'transparent',
 			color: 'inherit',
 			fontSize: 'inherit',
-			fontFamily: 'inherit',
 			fontWeight: 'inherit',
 			textAlign: 'left',
 			textShadow: 'none',
@@ -83,9 +84,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			height: 'height',
 			zIndex: 'z-index'
 		},
-		skipProperties: ['fontFamily'],
+		skipProperties: [],
 		decomposeTransform: true,
-		autoDimensions: true,
+		highlightSceneMagic: true,
 	};
 
 	// --- Two-Cache System ---
@@ -323,6 +324,60 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 	}
 
 	/**
+	 * Logs a warning about an interrupted magic transition, including details about the elements involved.
+	 * @param {object} documentState - The state object for the current Hype document.
+	 */
+	function logInterruptedTransition(documentState) {
+		// inform the user that the transition was ended and why
+		const allTweens = documentState.masterTimeline.getChildren();
+		const interruptedElements = [];
+
+		allTweens.forEach(tween => {
+			if (tween.progress() !== 1 && tween._targets && Array.isArray(tween._targets)) {
+				tween._targets.forEach(target => {
+					if (target && target.id) {
+						const magicIds = getTransitionIdentifiers(target);
+						
+						// Check animation attributes
+						const animations = [
+							target.getAttribute('data-transition-animation') && `animation: ${target.getAttribute('data-transition-animation')}`,
+							target.getAttribute('data-transition-animation-from') && `animation-from: ${target.getAttribute('data-transition-animation-from')}`,
+							target.getAttribute('data-transition-animation-to') && `animation-to: ${target.getAttribute('data-transition-animation-to')}`
+						].filter(Boolean);
+						
+						// Build element info string
+						let elementInfo = `${target.id} (magic: ${magicIds.length > 0 ? magicIds.join(', ') : 'none'})`;
+						
+						const details = [
+							target.getAttribute('data-transition-delay') && `delay: ${target.getAttribute('data-transition-delay')}`,
+							target.getAttribute('data-transition-duration') && `duration: ${target.getAttribute('data-transition-duration')}`,
+							animations.length > 0 && animations.join(', ')
+						].filter(Boolean);
+						
+						if (details.length > 0) elementInfo += ` - ${details.join(', ')}`;
+						
+						interruptedElements.push(elementInfo);
+					}
+				});
+			}
+		});
+
+		const baseMessage = "%cHypeSceneMagic: %cPrevious magic transition was interrupted by a new one. This indicates overlapping magic transitions in your Hype document.";
+		const baseStyles = ["font-weight: bold;", "font-weight: normal;"];
+
+		if (interruptedElements.length > 0) {
+			console.warn(
+				baseMessage + "\n\n%cInterrupted elements:\n%c" + interruptedElements.map((el, i) => `${i+1}. ${el}`).join('\n'),
+				...baseStyles,
+				"font-weight: bold; margin-top: 8px;",
+				"font-family: monospace; font-size: 11px; line-height: 1.8; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);"
+			);
+		} else {
+			console.warn(baseMessage, ...baseStyles);
+		}
+	}
+
+	/**
 	 * Main document load handler for Hype Scene Magic functionality
 	 * @param {Object} hypeDocument - The Hype document instance
 	 * @param {HTMLElement} element - The document element
@@ -351,28 +406,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 	 * @param {number} angle - The angle in degrees.
 	 * @returns {number} The normalized angle.
 	 */
-	/**
-	 * Resolves 'auto' dimensions for a set of elements by measuring and setting them explicitly.
-	 * This should be called within a requestAnimationFrame to ensure layout is complete.
-	 * @param {NodeList} elements - A list of elements to process.
-	 */
-	function resolveAutoDimensions(elements) {
-	    elements.forEach(el => {
-	        const pristineProps = _pristineElementCache.get(el);
-	        if (!pristineProps) return;
-
-	        ['width', 'height'].forEach(key => {
-	            if (pristineProps[key] === 'auto') {
-	                const measuredValue = el['offset' + key.charAt(0).toUpperCase() + key.slice(1)] + 'px';
-	                // Update the live element's style
-	                el.style[key] = measuredValue;
-	                // Update the pristine cache with the resolved value
-	                pristineProps[key] = measuredValue;
-	            }
-	        });
-	    });
-	}
-
 	function normalizeAngle(angle) {
 	    let newAngle = angle % 360;
 	    if (newAngle > 180) {
@@ -406,12 +439,19 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 			if (hypeDocElm.classList.contains('magicTransition')) {
 				const documentState = _documentStates.get(hypeDocument);
 				if (documentState && documentState.masterTimeline) {
-					// end the timeline by forwarding to the end
+					// inform the user that the transition was ended and why
+                    logInterruptedTransition(documentState);
+                    // end the timeline by forwarding to the end
 					documentState.masterTimeline.progress(1);
+                    // kill the tweens and the timeline itself
+                    gsap.killTweensOf(documentState.masterTimeline);
 					// remove the master timeline reference
 					delete documentState.masterTimeline;
-					// inform the user that the transition was ended and why
-					console.warn('HypeSceneMagic: Previous magic transition was interrupted by a new one. This indicates overlapping magic transitions in your Hype document.');
+					// call itself with same signature/params one requestAnimationFrame later if it was interrupted
+                    requestAnimationFrame(() => {
+                        this.showSceneNamedMagic(targetSceneName, duration, ease, options);
+                    });
+                    return;
 				}
 			}
 			
@@ -600,8 +640,9 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 						const fromProperties = getCurrentMagicProperties(sourceElement);
 
 						// Get the PRISTINE properties of the target for the transition's end state.
-						const toProperties = _pristineElementCache.get(targetElement) || getCurrentMagicProperties(targetElement);
-
+                        // Use spread syntax {...} to create a shallow COPY. This is critical to prevent
+                        // mutating the object stored in the pristine cache on subsequent runs.
+                        const toProperties = { ...(_pristineElementCache.get(targetElement) || getCurrentMagicProperties(targetElement)) };
 
 						// Helper function to get attribute value from source or target element
 						function getAttributeValue(attr, defaultValue) {
@@ -640,7 +681,6 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 								}
 							}
 						});
-
 
                         if (getDefault('decomposeTransform')) {
                             // Extract and strip rotations, then merge them into the properties objects
@@ -726,11 +766,8 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 								const delayPercentage = targetElement.getAttribute('data-transition-delay') || 0;
 								const durationPercentage = targetElement.getAttribute('data-transition-duration') || 1;
 								const timing = calculateTimingValues(delayPercentage, durationPercentage, duration);
-
-								// Get easing from target element or use default
 								const easing = targetElement.getAttribute('data-transition-ease') || ease;
 
-								// Add animation to master timeline
 								masterTimeline.from(targetElement, {
 									duration: timing.duration,
 									ease: getEase(easing),
@@ -810,9 +847,17 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 					// Kill any existing animations
 					gsap.killTweensOf(element);
 					
-					let animationData = animation.includes(':') ? 
-							parseSimpleAnimation(animation) : 
-							getRegisteredAnimation(animation);
+					let animationData;
+					
+					// Check if animation is a registered animation name
+					if (!animation.includes(':')) {
+						animationData = getRegisteredAnimation(animation);
+					}
+					
+					// If not a registered animation, parse as simple animation string
+					if (!animationData) {
+						animationData = parseSimpleAnimation(animation);
+					}
 
 					if (animationData) {
 						const delayPercentage = element.getAttribute('data-transition-delay') || 0;
@@ -1042,19 +1087,104 @@ if ("HypeSceneMagic" in window === false) window['HypeSceneMagic'] = (function()
 					_pristineElementCache.set(el, getCurrentMagicProperties(el));
 				}
 			});
-
-			// Proactively resolve auto dimensions if the feature is enabled
-			if (getDefault('autoDimensions')) {
-				requestAnimationFrame(() => {
-					resolveAutoDimensions(transitionElements);
-				});
-			}
 		}
 	}
 
 	if ("HYPE_eventListeners" in window === false) window.HYPE_eventListeners = Array();
 	window.HYPE_eventListeners.push({ "type": "HypeDocumentLoad", "callback": HypeDocumentLoad });
 	window.HYPE_eventListeners.push({ "type": "HypeScenePrepareForDisplay", "callback": HypeScenePrepareForDisplay });
+
+
+    // --- Hype IDE Specific Code ---
+	// This block runs only inside the Hype Editor to show visual indicators.
+	if (_isHypeIDE && getDefault('highlightSceneMagic')) {
+		window.addEventListener("DOMContentLoaded", function (event) {
+			if (!document.getElementById('magicElementIndicatorStyle')) {
+				
+				// --- Programmatic Selector Generation ---
+	
+				// 1. Define all attributes to exclude in one place.
+				const classExclusions = [
+					'data-scope',
+					'data-content',
+					'data-visibility',
+					'data-effect',
+					'data-content-template',
+					'data-magic-key',
+					'magic-edit',
+				];
+	
+				// 2. Create a helper function to build the complex selector strings.
+				const createExclusionSelector = (baseSelectors) => {
+					const notChain = classExclusions.map(attr => `:not([${attr}])`).join('');
+					return baseSelectors.map(selector => {
+						const pseudoIndex = selector.indexOf('::');
+						const base = selector.substring(0, pseudoIndex);
+						const pseudo = selector.substring(pseudoIndex);
+						return base + notChain + pseudo;
+					}).join(', ');
+				};
+	
+				// 3. Build the CSS using the helper function.
+				let style = document.createElement('style');
+				style.id = 'magicElementIndicatorStyle';
+				style.textContent = [
+					'@keyframes magic-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }',
+	
+					/* --- Base Indicator Style --- */
+					createExclusionSelector([
+						'div[data-transition-animation]::after', 'div[data-transition-animation-from]::after', 'div[data-transition-animation-to]::after',
+						'div[class*="magic"]::after', 'div[data-transition-id]::after'
+					]) + ' {',
+					'    position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; font-size: 12px;',
+					'    background-color: rgba(255, 215, 0, 0.15); border-radius: 50%;',
+					'    display: flex; align-items: center; justify-content: center;',
+					'    pointer-events: none; z-index: 9999;',
+					'}',
+
+					/* --- Specific Indicator Styles --- */
+					createExclusionSelector([
+						'div[data-transition-animation]::after', 'div[data-transition-animation-from]::after', 'div[data-transition-animation-to]::after'
+					]) + ' {',
+					'    content: "🎬";',
+					'}',
+	
+					createExclusionSelector([
+						'div[class*="magic"]::after', 'div[data-transition-id]::after'
+					]) + ' {',
+					'    content: "🌟";',
+					'    animation: magic-spin 5s linear infinite;',
+					'}',
+					
+					/* --- Combination State (Overrides Defaults) --- */
+	
+					createExclusionSelector([
+						'div[class*="magic"][data-transition-animation]::after', 'div[class*="magic"][data-transition-animation-from]::after', 'div[class*="magic"][data-transition-animation-to]::after',
+						'div[data-transition-id][data-transition-animation]::after', 'div[data-transition-id][data-transition-animation-from]::after', 'div[data-transition-id][data-transition-animation-to]::after'
+					]) + ' {',
+					'    content: "🎬";',
+					'    animation: none;',
+					'}',
+					
+					createExclusionSelector([
+						'div[class*="magic"][data-transition-animation]::before', 'div[class*="magic"][data-transition-animation-from]::before', 'div[class*="magic"][data-transition-animation-to]::before',
+						'div[data-transition-id][data-transition-animation]::before', 'div[data-transition-id][data-transition-animation-from]::before', 'div[data-transition-id][data-transition-animation-to]::before'
+					]) + ' {',
+					'    content: "🌟";',
+					'    position: absolute;',
+					'    top: 4px;',
+					'    right: -10px;',
+					'    font-size: 8px;',
+					'    animation: magic-spin 5s linear infinite;',
+					'    transform: translate(50%, 50%);',
+					'    z-index: 10000;',
+					'    pointer-events: none;',
+					'}'
+				].join(' ');
+				document.head.appendChild(style);
+			}
+		});
+	}
 
 	return {
 		version: _version,
